@@ -39,13 +39,13 @@ Unique Features:
 - Thousand-pillar mandapam with intricate carvings
 """,
     },
-    
+
     "krishnapuram_palace": {
         "name": "Krishnapuram Palace",
         "type": "Palace/Museum",
         "location": "Krishnapuram, near Tirunelveli",
         "keywords": ["krishnapuram", "palace", "mural", "painting", "nayak", "museum", "gajendra"],
-        "default_persona":  "british_collector",
+        "default_persona": "british_collector",
         "image_hints": ["palace", "mural", "painting", "courtyard", "museum"],
         "historical_context": """
 KRISHNAPURAM PALACE - Key Facts:
@@ -75,7 +75,7 @@ Historical Significance:
 - Important example of secular Nayak architecture
 """,
     },
-    
+
     "panchalankurichi":  {
         "name": "Panchalankurichi Fort & Memorial",
         "type": "Historical Site/Memorial",
@@ -116,8 +116,8 @@ Legacy:
 - Tamil movie "Veerapandiya Kattabomman" (1959) made him famous
 """,
     },
-    
-    "tamiraparani_river":  {
+
+    "tamiraparani_river": {
         "name": "Tamiraparani River",
         "type": "Natural/Sacred Site",
         "location": "Tirunelveli District",
@@ -159,27 +159,30 @@ Cultural References:
     }
 }
 
+
 def get_landmark(landmark_key):
     """Get a landmark by its key."""
     return LANDMARKS.get(landmark_key)
+
 
 def get_all_landmarks():
     """Get all available landmarks."""
     return LANDMARKS
 
+
 def identify_landmark_from_text(text):
     """Try to identify a landmark from text description."""
     text_lower = text.lower()
-    
+
     for key, landmark in LANDMARKS.items():
         # Check keywords
         for keyword in landmark["keywords"]: 
             if keyword. lower() in text_lower:
                 return key
-        
+
         # Check image hints
         for hint in landmark["image_hints"]:
             if hint. lower() in text_lower:
                 return key
-    
+
     return None
