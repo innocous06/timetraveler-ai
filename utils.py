@@ -1,6 +1,6 @@
 """
 Utility functions for TimeTraveler AI.
-Updated for December 2025 - Uses gemini-2.5-flash
+Updated for December 2025 - Fixed TTS issue
 """
 
 import streamlit as st
@@ -13,7 +13,6 @@ from landmarks import get_landmark, identify_landmark_from_text
 from personas import get_persona
 
 # ============== CONFIGURATION ==============
-# Default model - gemini-2.5-flash works on free tier (December 2025)
 DEFAULT_MODEL = "gemini-2.5-flash"
 
 
@@ -21,7 +20,7 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 def configure_gemini(api_key=None):
     """
-    Configure the Gemini API. 
+    Configure the Gemini API.  
     Priority:  1. Provided key, 2. Streamlit secrets
     """
     if api_key:
@@ -37,7 +36,7 @@ def configure_gemini(api_key=None):
 def get_gemini_model(model_name=None):
     """
     Get a Gemini model instance.
-    Uses gemini-2.5-flash by default (works on free tier).
+    Uses gemini-2.5-flash by default.
     """
     if model_name is None:
         model_name = DEFAULT_MODEL
@@ -54,9 +53,9 @@ def analyze_image(image, model):
     """
     Use Gemini Vision to analyze an image and identify landmarks.
     """
-    prompt = """Look at this image carefully.  Identify if this shows any landmark from Tirunelveli, Tamil Nadu, India. 
+    prompt = """Look at this image carefully.  Identify if this shows any landmark from Tirunelveli, Tamil Nadu, India.  
 
-Possible landmarks: 
+Possible landmarks:  
 1. Nellaiappar Temple - Hindu temple with tall gopuram (tower), musical pillars, Dravidian architecture
 2. Krishnapuram Palace - 17th century palace with murals, Kerala-style sloped roof
 3. Panchalankurichi Fort/Memorial - Fort ruins or Kattabomman memorial/statue
@@ -112,7 +111,7 @@ def match_to_landmark_database(identification):
     if not identification. get("identified", False):
         return None
 
-    landmark_name = identification. get("landmark_name", "").lower()
+    landmark_name = identification.get("landmark_name", "").lower()
     visual_elements = identification.get("visual_elements", "").lower()
 
     search_text = f"{landmark_name} {visual_elements}"
@@ -124,20 +123,20 @@ def generate_persona_response(persona_key, landmark_key, user_message, chat_hist
     Generate a response from a historical persona.
     """
     persona = get_persona(persona_key)
-    if not persona: 
+    if not persona:
         return "Error: Persona not found."
 
     # Build system context
     system_context = persona["system_prompt"]
 
     # Add landmark context if available
-    if landmark_key:
+    if landmark_key: 
         landmark = get_landmark(landmark_key)
         if landmark:
             system_context += f"""
 
 CURRENT LOCATION: {landmark['name']}
-You are at this location with the traveler. Use this information: 
+You are at this location with the traveler.  Use this information:  
 {landmark['historical_context']}
 """
 
@@ -150,15 +149,15 @@ You are at this location with the traveler. Use this information:
         "parts": [f"[SYSTEM INSTRUCTIONS - Follow exactly]\n{system_context}"]
     })
     conversation.append({
-        "role":  "model",
-        "parts":  ["I understand completely. I am now fully in character. "]
+        "role": "model",
+        "parts": ["I understand completely. I am now fully in character. "]
     })
 
     # Add chat history
     for msg in chat_history:
         role = "user" if msg["role"] == "user" else "model"
         conversation.append({
-            "role":  role,
+            "role": role,
             "parts": [msg["content"]]
         })
 
@@ -189,44 +188,84 @@ Keep it to 2-3 sentences.  Be engaging! """
     )
 
 
-# ============== TEXT-TO-SPEECH ==============
+# ============== TEXT-TO-SPEECH (FIXED) ==============
 
 def text_to_speech(text, lang='en', slow=False):
     """
-    Convert text to speech using Google TTS (free).
+    Convert text to speech using Google TTS.
+    Returns base64 encoded audio string (not bytes object).
     """
-    try: 
+    try:
         # Clean text for better speech
         clean_text = text.replace("*", "").replace("_", "").replace("#", "")
+        
+        # Remove any markdown formatting
+        clean_text = clean_text.replace("**", "").replace("__", "")
+        
+        # Limit length to avoid TTS issues
+        if len(clean_text) > 5000:
+            clean_text = clean_text[:5000]
 
         tts = gTTS(text=clean_text, lang=lang, slow=slow)
         audio_buffer = BytesIO()
         tts.write_to_fp(audio_buffer)
         audio_buffer.seek(0)
-        return audio_buffer
+        
+        # Convert to base64 string immediately (so it can be reused)
+        b64_audio = base64.b64encode(audio_buffer.read()).decode()
+        
+        return b64_audio
 
     except Exception as e:
         print(f"TTS Error: {e}")
         return None
 
 
-def get_audio_html(audio_bytes, autoplay=True):
+def get_audio_player_html(b64_audio, autoplay=True):
     """
-    Create HTML audio element for Streamlit.
+    Create HTML audio player from base64 audio string.
+    Uses a unique key to force re-render.
     """
-    if audio_bytes is None:
+    if b64_audio is None:
         return ""
 
-    b64_audio = base64.b64encode(audio_bytes. read()).decode()
+    # Create unique ID for this audio element
+    import time
+    unique_id = f"audio_{int(time.time() * 1000)}"
+    
     autoplay_attr = "autoplay" if autoplay else ""
 
     html = f"""
-    <audio {autoplay_attr} controls style="width: 100%;">
+    <audio id="{unique_id}" {autoplay_attr} controls style="width: 100%; margin:  10px 0;">
         <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
         Your browser does not support audio. 
     </audio>
+    <script>
+        // Ensure audio plays
+        var audio = document.getElementById('{unique_id}');
+        if (audio) {{
+            audio. play().catch(function(e) {{
+                console.log('Autoplay prevented:', e);
+            }});
+        }}
+    </script>
     """
     return html
+
+
+def play_audio_in_streamlit(text, autoplay=True):
+    """
+    Complete function to generate and display audio player.
+    Call this directly in your app.
+    """
+    if not text:
+        return
+    
+    b64_audio = text_to_speech(text)
+    
+    if b64_audio: 
+        audio_html = get_audio_player_html(b64_audio, autoplay)
+        st.markdown(audio_html, unsafe_allow_html=True)
 
 
 # ============== SUGGESTIONS ==============
@@ -237,7 +276,7 @@ def get_suggested_questions(persona_key, landmark_key=None):
     """
     suggestions = {
         "king_rama_pandya": {
-            "general":  [
+            "general": [
                 "What was daily life like in your palace?",
                 "Tell me about the wars you fought",
                 "What festivals did your kingdom celebrate?",
@@ -253,7 +292,7 @@ def get_suggested_questions(persona_key, landmark_key=None):
                 "How did the river help your people?",
             ],
         },
-        "temple_priest": {
+        "temple_priest":  {
             "general": [
                 "What is the most sacred part of this temple?",
                 "Tell me about the daily rituals you perform",
@@ -277,7 +316,7 @@ def get_suggested_questions(persona_key, landmark_key=None):
                 "What artifacts did you find most interesting?",
             ],
         },
-        "freedom_fighter":  {
+        "freedom_fighter": {
             "general": [
                 "Why did you refuse to pay tribute to the British?",
                 "Tell me about your soldiers",
