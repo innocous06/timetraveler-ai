@@ -1,13 +1,13 @@
 """
 TimeTraveler AI:  The Nellai Chronicles
 Main Streamlit Application - December 2025
-
-A Role-Playing Experience that brings history to life through AI personas.
+FIXED:  Text-to-Speech now works on every message
 """
 
 import streamlit as st
 from PIL import Image
 import google.generativeai as genai
+import time
 
 from personas import get_persona, get_all_personas, get_persona_names
 from landmarks import get_landmark, get_all_landmarks
@@ -19,7 +19,7 @@ from utils import (
     generate_persona_response,
     generate_greeting,
     text_to_speech,
-    get_audio_html,
+    get_audio_player_html,
     get_suggested_questions,
     DEFAULT_MODEL,
 )
@@ -37,7 +37,7 @@ st.markdown("""
 <style>
     /* Dark theme background */
     .stApp {
-        background:  linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     }
 
     /* Main header */
@@ -48,7 +48,7 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-size: 2.8rem;
-        font-weight:  bold;
+        font-weight: bold;
     }
 
     . sub-header {
@@ -71,7 +71,7 @@ st.markdown("""
     .persona-name {
         color: #e94560;
         font-size: 1.5rem;
-        margin:  0;
+        margin: 0;
     }
 
     .persona-title {
@@ -89,7 +89,7 @@ st.markdown("""
         background: #16213e;
         border-left: 4px solid #00fff5;
         padding: 15px;
-        margin:  10px 0;
+        margin: 10px 0;
         border-radius: 0 10px 10px 0;
         color: #ffffff;
     }
@@ -114,8 +114,15 @@ st.markdown("""
         margin: 10px 0;
     }
 
+    /* Audio player styling */
+    audio {
+        width: 100%;
+        margin: 10px 0;
+        border-radius: 25px;
+    }
+
     /* Footer */
-    . footer {
+    .footer {
         text-align: center;
         color: #666;
         padding: 20px;
@@ -140,6 +147,8 @@ def init_session_state():
         "audio_enabled": True,
         "model":  None,
         "greeted": False,
+        "pending_audio": None,  # Store audio to play
+        "last_audio_id": 0,     # Track audio to avoid replays
     }
 
     for key, value in defaults.items():
@@ -159,12 +168,11 @@ def render_sidebar():
         # API Key Section
         st.markdown("### 🔑 API Configuration")
 
-        # Check for secret first
         has_secret = "GEMINI_API_KEY" in st.secrets
 
         if has_secret:
             api_key = st.secrets["GEMINI_API_KEY"]
-            st.success("✅ API Key loaded from secrets")
+            st.success("✅ API Key loaded")
         else:
             api_key = st.text_input(
                 "Gemini API Key",
@@ -178,23 +186,28 @@ def render_sidebar():
                 st.session_state. model = get_gemini_model()
                 st.session_state. api_configured = True
                 if not has_secret:
-                    st. success("✅ Connected!")
-                st.caption(f"📦 Model: `{DEFAULT_MODEL}`")
+                    st.success("✅ Connected!")
+                st.caption(f"📦 `{DEFAULT_MODEL}`")
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Error:  {e}")
                 st.session_state.api_configured = False
         else:
-            st.info("👆 Enter your API key")
+            st.info("👆 Enter API key")
             st.markdown("[Get FREE Key →](https://aistudio.google.com/app/apikey)")
 
         st.markdown("---")
 
         # Audio Toggle
-        st.markdown("### 🔊 Audio")
+        st.markdown("### 🔊 Audio Settings")
         st.session_state.audio_enabled = st.checkbox(
             "Enable Voice Output",
             value=st.session_state.audio_enabled
         )
+        
+        if st.session_state.audio_enabled:
+            st.caption("🔊 Voice is ON")
+        else:
+            st.caption("🔇 Voice is OFF")
 
         st.markdown("---")
 
@@ -207,7 +220,7 @@ def render_sidebar():
         selected = st.selectbox(
             "Historical figure:",
             options=list(persona_options.keys()),
-            format_func=lambda x: persona_options[x]
+            format_func=lambda x:  persona_options[x]
         )
 
         if selected != "auto":
@@ -215,13 +228,14 @@ def render_sidebar():
                 st.session_state.current_persona = selected
                 st. session_state.chat_history = []
                 st. session_state.greeted = False
+                st.session_state.pending_audio = None
                 st.rerun()
 
         st.markdown("---")
 
         # Quick Demo Buttons
         st.markdown("### 📍 Quick Demo")
-        st.caption("No images?  Try these:")
+        st.caption("No images? Try these:")
 
         demo_options = [
             ("🛕 Temple + Priest", "nellaiappar_temple", "temple_priest"),
@@ -236,6 +250,7 @@ def render_sidebar():
                 st. session_state.current_persona = persona
                 st.session_state.chat_history = []
                 st.session_state.greeted = False
+                st.session_state.pending_audio = None
                 st.rerun()
 
         st.markdown("---")
@@ -246,7 +261,8 @@ def render_sidebar():
             st.session_state.current_persona = None
             st.session_state.current_landmark = None
             st.session_state. greeted = False
-            st. rerun()
+            st. session_state.pending_audio = None
+            st.rerun()
 
         st.markdown("---")
         st.caption("Built for Hackathon 2025 🏆")
@@ -262,12 +278,12 @@ st.markdown('<h1 class="main-header">🏛️ TimeTraveler AI</h1>', unsafe_allow
 st.markdown('<p class="sub-header">The Nellai Chronicles — Where History Speaks</p>', unsafe_allow_html=True)
 
 # Two columns layout
-col_left, col_right = st.columns([1, 1], gap="large")
+col_left, col_right = st. columns([1, 1], gap="large")
 
 
 # ============== LEFT COLUMN - IMAGE ==============
-with col_left: 
-    st.markdown("### 📸 Scan a Monument")
+with col_left:
+    st. markdown("### 📸 Scan a Monument")
 
     uploaded_image = st.file_uploader(
         "Upload a photo of a Tirunelveli landmark",
@@ -297,14 +313,15 @@ with col_left:
                         st.session_state.current_persona = landmark["default_persona"]
                         st. session_state.chat_history = []
                         st.session_state.greeted = False
+                        st.session_state.pending_audio = None
                         st.rerun()
                     else:
-                        st. warning("🔍 Couldn't identify.  Try demo buttons!")
+                        st.warning("🔍 Couldn't identify.  Try demo buttons!")
         else:
             st.warning("⚠️ Configure API key first")
 
     # Show current landmark
-    if st.session_state. current_landmark:
+    if st.session_state.current_landmark:
         landmark = get_landmark(st.session_state.current_landmark)
         if landmark:
             st.markdown("---")
@@ -319,7 +336,7 @@ with col_right:
     st.markdown("### 💬 Speak with History")
 
     if st.session_state.current_persona:
-        persona = get_persona(st.session_state.current_persona)
+        persona = get_persona(st. session_state.current_persona)
 
         # Persona Card
         st.markdown(f"""
@@ -341,76 +358,85 @@ with col_right:
 
                 st.session_state.chat_history.append({
                     "role": "assistant",
-                    "content": greeting
+                    "content": greeting,
+                    "audio":  text_to_speech(greeting) if st.session_state.audio_enabled else None
                 })
                 st.session_state.greeted = True
 
-                if st.session_state.audio_enabled:
-                    audio = text_to_speech(greeting)
-                    if audio:
-                        st.markdown(get_audio_html(audio, autoplay=True), unsafe_allow_html=True)
-
-        # Display chat history
-        for msg in st.session_state.chat_history:
-            if msg["role"] == "user":
+        # Display chat history with audio
+        for i, msg in enumerate(st.session_state.chat_history):
+            if msg["role"] == "user": 
                 st.markdown(f"""
                 <div class="user-msg">
                     <strong>🧑 You:</strong><br>{msg["content"]}
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st. markdown(f"""
+                st.markdown(f"""
                 <div class="ai-msg">
                     <strong>{persona['avatar']} {persona['name']}:</strong><br>{msg["content"]}
                 </div>
                 """, unsafe_allow_html=True)
+                
+                # Show audio player for this message
+                if st.session_state.audio_enabled and msg. get("audio"):
+                    audio_html = get_audio_player_html(
+                        msg["audio"], 
+                        autoplay=(i == len(st.session_state.chat_history) - 1)  # Autoplay only latest
+                    )
+                    st. markdown(audio_html, unsafe_allow_html=True)
 
         # Chat input
         st.markdown("---")
 
-        user_input = st.text_input(
-            "Your question:",
-            placeholder="Ask about history, architecture, daily life...",
-            key="chat_input",
-            label_visibility="collapsed"
-        )
-
-        col_send, col_status = st.columns([3, 1])
-
-        with col_send:
-            send_clicked = st.button("📤 Send", use_container_width=True)
-
-        with col_status:
-            if st.session_state.audio_enabled: 
-                st.markdown("🔊 ON")
-            else:
-                st.markdown("🔇 OFF")
+        # Use a form to handle input better
+        with st.form(key="chat_form", clear_on_submit=True):
+            user_input = st. text_input(
+                "Your question:",
+                placeholder="Ask about history, architecture, daily life.. .",
+                key="chat_input",
+                label_visibility="collapsed"
+            )
+            
+            col_send, col_status = st.columns([3, 1])
+            
+            with col_send:
+                send_clicked = st.form_submit_button("📤 Send", use_container_width=True)
+            
+            with col_status:
+                if st.session_state.audio_enabled: 
+                    st.markdown("🔊 Voice ON")
+                else:
+                    st.markdown("🔇 Voice OFF")
 
         # Handle send
         if send_clicked and user_input and st.session_state.api_configured:
+            # Add user message
             st.session_state.chat_history.append({
-                "role":  "user",
-                "content":  user_input
+                "role": "user",
+                "content": user_input,
+                "audio": None
             })
 
             with st.spinner("✨ Channeling... "):
                 response = generate_persona_response(
-                    st. session_state.current_persona,
+                    st.session_state. current_persona,
                     st.session_state.current_landmark,
                     user_input,
-                    st. session_state.chat_history[:-1],
+                    [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history[:-1]],
                     st.session_state.model
                 )
 
+                # Generate audio for response
+                audio_b64 = None
+                if st.session_state.audio_enabled:
+                    audio_b64 = text_to_speech(response)
+
                 st.session_state.chat_history.append({
                     "role": "assistant",
-                    "content": response
+                    "content": response,
+                    "audio": audio_b64
                 })
-
-                if st.session_state.audio_enabled:
-                    audio = text_to_speech(response)
-                    if audio:
-                        st.markdown(get_audio_html(audio, autoplay=True), unsafe_allow_html=True)
 
             st.rerun()
 
@@ -425,23 +451,31 @@ with col_right:
 
         for i, suggestion in enumerate(suggestions):
             if st.button(f"❓ {suggestion}", key=f"sug_{i}", use_container_width=True):
-                st.session_state. chat_history.append({
+                # Add user message
+                st.session_state.chat_history.append({
                     "role": "user",
-                    "content": suggestion
+                    "content": suggestion,
+                    "audio": None
                 })
 
-                with st.spinner("✨"):
+                with st.spinner("✨ Channeling..."):
                     response = generate_persona_response(
-                        st. session_state.current_persona,
-                        st.session_state.current_landmark,
+                        st.session_state.current_persona,
+                        st.session_state. current_landmark,
                         suggestion,
-                        st.session_state.chat_history[:-1],
+                        [{"role":  m["role"], "content": m["content"]} for m in st.session_state.chat_history[:-1]],
                         st.session_state.model
                     )
 
+                    # Generate audio
+                    audio_b64 = None
+                    if st.session_state.audio_enabled:
+                        audio_b64 = text_to_speech(response)
+
                     st.session_state.chat_history.append({
                         "role": "assistant",
-                        "content": response
+                        "content": response,
+                        "audio": audio_b64
                     })
 
                 st.rerun()
