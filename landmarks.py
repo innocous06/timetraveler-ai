@@ -1,8 +1,3 @@
-"""
-Landmark database for TimeTraveler AI.
-Contains information about Tirunelveli landmarks for the AI to reference.
-"""
-
 LANDMARKS = {
     "nellaiappar_temple": {
         "name": "Nellaiappar Temple",
@@ -12,7 +7,7 @@ LANDMARKS = {
         "default_persona": "temple_priest",
         "image_hints": ["gopuram", "tower", "temple", "pillars", "carved", "hindu", "dravidian"],
         "historical_context": """
-NELLAIAPPAR TEMPLE - Key Facts: 
+NELLAIAPPAR TEMPLE - Key Facts:
 
 Architecture:
 - Ancient Dravidian style temple dedicated to Lord Shiva
@@ -39,7 +34,6 @@ Unique Features:
 - Thousand-pillar mandapam with intricate carvings
 """,
     },
-
     "krishnapuram_palace": {
         "name": "Krishnapuram Palace",
         "type": "Palace/Museum",
@@ -75,7 +69,6 @@ Historical Significance:
 - Important example of secular Nayak architecture
 """,
     },
-
     "panchalankurichi":  {
         "name": "Panchalankurichi Fort & Memorial",
         "type": "Historical Site/Memorial",
@@ -116,7 +109,6 @@ Legacy:
 - Tamil movie "Veerapandiya Kattabomman" (1959) made him famous
 """,
     },
-
     "tamiraparani_river": {
         "name": "Tamiraparani River",
         "type": "Natural/Sacred Site",
@@ -158,31 +150,17 @@ Cultural References:
 """,
     }
 }
-
-
 def get_landmark(landmark_key):
-    """Get a landmark by its key."""
     return LANDMARKS.get(landmark_key)
-
-
 def get_all_landmarks():
-    """Get all available landmarks."""
     return LANDMARKS
-
-
 def identify_landmark_from_text(text):
-    """Try to identify a landmark from text description."""
     text_lower = text.lower()
-
     for key, landmark in LANDMARKS.items():
-        # Check keywords
-        for keyword in landmark["keywords"]: 
+        for keyword in landmark["keywords"]:
             if keyword. lower() in text_lower:
                 return key
-
-        # Check image hints
         for hint in landmark["image_hints"]:
             if hint. lower() in text_lower:
                 return key
-
     return None

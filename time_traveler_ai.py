@@ -1,8 +1,3 @@
-"""
-TimeTraveler AI: The Nellai Chronicles
-A Role-Playing Experience that brings history to life through AI personas. 
-"""
-
 import streamlit as st
 import google.generativeai as genai
 from gtts import gTTS
@@ -11,13 +6,6 @@ from io import BytesIO
 from PIL import Image
 import json
 from datetime import datetime
-
-# ============== CONFIGURATION ==============
-# Set your API key here or use Streamlit secrets
-# genai.configure(api_key="YOUR_GEMINI_API_KEY")
-# For production, use:  genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-# ============== PERSONA DEFINITIONS ==============
 PERSONAS = {
     "king_rama_pandya": {
         "name": "King Rama Pandya",
@@ -25,9 +13,9 @@ PERSONAS = {
         "era": "15th Century",
         "avatar": "👑",
         "voice_style": "royal and dignified",
-        "system_prompt": """You are King Rama Pandya, a great ruler of the Pandyan dynasty who reigned in the 15th century. 
-        
-Your personality: 
+        "system_prompt": """You are King Rama Pandya, a great ruler of the Pandyan dynasty who reigned in the 15th century.
+
+Your personality:
 - You speak with royal dignity but warmth towards travelers
 - You take immense pride in the temples and monuments you commissioned
 - You often reference the skilled artisans and architects who served your kingdom
@@ -46,14 +34,13 @@ Historical context you know:
 - The Tamiraparani River: Sacred river of the region
 - Trade with foreign merchants, temple festivals, and court life""",
     },
-    
     "temple_priest": {
         "name": "Acharya Sundaram",
         "title": "Head Priest of Nellaiappar Temple",
         "era":  "18th Century",
         "avatar":  "🙏",
         "voice_style": "spiritual and wise",
-        "system_prompt":  """You are Acharya Sundaram, the head priest (Acharya) of Nellaiappar Temple in the 18th century. 
+        "system_prompt":  """You are Acharya Sundaram, the head priest (Acharya) of Nellaiappar Temple in the 18th century.
 
 Your personality:
 - You are deeply spiritual and see divine meaning in everything
@@ -75,11 +62,10 @@ Historical context you know:
 - The temple's connection to Nayak rulers who renovated it
 - Stories from Shiva Puranas related to the temple""",
     },
-    
     "british_collector": {
         "name": "Colonel James Welsh",
         "title": "British District Collector",
-        "era":  "Early 19th Century", 
+        "era":  "Early 19th Century",
         "avatar": "🎩",
         "voice_style":  "formal British accent",
         "system_prompt": """You are Colonel James Welsh, a British East India Company officer and District Collector in Tirunelveli in the early 1800s.
@@ -104,14 +90,13 @@ Historical context you know:
 - The rebellion and political changes of the era
 - Trade routes, indigo plantations, and administration""",
     },
-    
     "freedom_fighter": {
         "name": "Veerapandiya Kattabomman",
         "title": "The Brave Palayakkarar Chief",
         "era": "Late 18th Century",
         "avatar":  "⚔️",
         "voice_style": "fierce and passionate",
-        "system_prompt":  """You are Veerapandiya Kattabomman, the legendary Palayakkarar (feudal lord) of Panchalankurichi who fought against British rule. 
+        "system_prompt":  """You are Veerapandiya Kattabomman, the legendary Palayakkarar (feudal lord) of Panchalankurichi who fought against British rule.
 
 Your personality:
 - You are fierce, proud, and passionate about freedom
@@ -134,14 +119,12 @@ Historical context you know:
 - Local customs, martial traditions, and Tamil pride""",
     }
 }
-
-# ============== LANDMARK DATABASE ==============
 LANDMARKS = {
     "nellaiappar_temple": {
         "name":  "Nellaiappar Temple",
         "keywords": ["nellaiappar", "temple", "gopuram", "tower", "shiva", "musical pillars"],
         "default_persona": "temple_priest",
-        "context": """Nellaiappar Temple is an ancient Hindu temple dedicated to Lord Shiva, located in Tirunelveli. 
+        "context": """Nellaiappar Temple is an ancient Hindu temple dedicated to Lord Shiva, located in Tirunelveli.
 Key features:
 - Famous for its 48 musical pillars carved from single stones
 - The Gopuram (tower) rises to 150 feet with intricate carvings
@@ -166,7 +149,7 @@ Key features:
         "name": "Panchalankurichi Fort",
         "keywords": ["panchalankurichi", "fort", "kattabomman", "memorial"],
         "default_persona":  "freedom_fighter",
-        "context": """Panchalankurichi is the historic seat of Veerapandiya Kattabomman. 
+        "context": """Panchalankurichi is the historic seat of Veerapandiya Kattabomman.
 Key features:
 - The memorial commemorates the great freedom fighter
 - Original fort was destroyed by the British after 1799
@@ -187,81 +170,57 @@ Key features:
 - Mentioned in Sangam literature as 'Porunai'"""
     }
 }
-
-# ============== HELPER FUNCTIONS ==============
-
 def identify_landmark(image, model):
-    """Use Gemini Vision to identify the landmark in the image."""
-    prompt = """Analyze this image and identify if it shows any of these landmarks from Tirunelveli, Tamil Nadu, India: 
+    prompt = """Analyze this image and identify if it shows any of these landmarks from Tirunelveli, Tamil Nadu, India:
     1. Nellaiappar Temple (Hindu temple with gopuram/tower, musical pillars)
     2. Krishnapuram Palace (17th century palace with murals)
     3. Panchalankurichi Fort/Memorial (Kattabomman memorial)
     4. Tamiraparani River (river with ghats)
-    
-    If you can identify it, respond with ONLY a JSON object: 
+
+    If you can identify it, respond with ONLY a JSON object:
     {"landmark": "landmark_name", "confidence":  "high/medium/low", "features": "brief description of what you see"}
-    
-    If you cannot identify it as any of these landmarks, respond with: 
+
+    If you cannot identify it as any of these landmarks, respond with:
     {"landmark": "unknown", "confidence": "none", "features": "description of what you see"}
-    
+
     IMPORTANT:  Respond ONLY with the JSON object, no other text."""
-    
     try:
         response = model.generate_content([prompt, image])
         result_text = response.text. strip()
-        
-        # Clean up the response
         if result_text.startswith("```"):
             result_text = result_text. split("```")[1]
             if result_text.startswith("json"):
                 result_text = result_text[4:]
-        
         result = json.loads(result_text)
         return result
-    except Exception as e: 
+    except Exception as e:
         return {"landmark": "unknown", "confidence": "none", "features": str(e)}
-
 def match_landmark(identification):
-    """Match the identification to our landmark database."""
     if identification["landmark"] == "unknown":
         return None
-    
     landmark_lower = identification["landmark"].lower()
-    
     for key, landmark in LANDMARKS.items():
         if any(keyword in landmark_lower for keyword in landmark["keywords"]):
             return key
-    
     return None
-
 def get_persona_response(persona_key, landmark_key, user_message, model, chat_history):
-    """Generate a response from the selected persona about the landmark."""
     persona = PERSONAS[persona_key]
     landmark = LANDMARKS[landmark_key] if landmark_key else None
-    
     system_prompt = persona["system_prompt"]
-    
-    if landmark: 
+    if landmark:
         system_prompt += f"\n\nYou are currently at {landmark['name']}. Here is factual information you can use:\n{landmark['context']}"
-    
-    # Build conversation history
     messages = [{"role": "user", "parts": [f"System: {system_prompt}"]}]
     messages.append({"role": "model", "parts": ["I understand.  I am now in character. "]})
-    
     for msg in chat_history:
         messages.append({"role": msg["role"], "parts": [msg["content"]]})
-    
     messages.append({"role": "user", "parts": [user_message]})
-    
     try:
         chat = model.start_chat(history=messages[:-1])
         response = chat.send_message(user_message)
         return response. text
-    except Exception as e: 
+    except Exception as e:
         return f"*The spirit seems distant... * (Error: {str(e)})"
-
 def text_to_speech(text, slow=False):
-    """Convert text to speech and return audio bytes."""
     try:
         tts = gTTS(text=text, lang='en', slow=slow)
         audio_bytes = BytesIO()
@@ -271,9 +230,7 @@ def text_to_speech(text, slow=False):
     except Exception as e:
         st.error(f"Audio generation failed: {e}")
         return None
-
 def autoplay_audio(audio_bytes):
-    """Create an autoplay audio element."""
     b64 = base64.b64encode(audio_bytes. read()).decode()
     audio_html = f"""
         <audio autoplay>
@@ -281,12 +238,10 @@ def autoplay_audio(audio_bytes):
         </audio>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
-
 def display_persona_card(persona_key):
-    """Display a nice card for the current persona."""
     persona = PERSONAS[persona_key]
     st.markdown(f"""
-    <div style="background:  linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+    <div style="background:  linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
                 padding: 20px; border-radius: 15px; margin: 10px 0;
                 border: 1px solid #e94560;">
         <h2 style="color: #e94560; margin:  0;">{persona['avatar']} {persona['name']}</h2>
@@ -294,18 +249,12 @@ def display_persona_card(persona_key):
         <p style="color: #00fff5; font-style: italic;">Era: {persona['era']}</p>
     </div>
     """, unsafe_allow_html=True)
-
-# ============== MAIN APP ==============
-
 def main():
-    # Page config
     st.set_page_config(
         page_title="TimeTraveler AI:  Nellai Chronicles",
         page_icon="🏛️",
         layout="wide"
     )
-    
-    # Custom CSS
     st.markdown("""
     <style>
     .stApp {
@@ -337,13 +286,9 @@ def main():
     }
     </style>
     """, unsafe_allow_html=True)
-    
-    # Header
     st. markdown('<h1 class="main-title">🏛️ TimeTraveler AI</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">The Nellai Chronicles - Where History Speaks</p>', unsafe_allow_html=True)
     st.markdown("---")
-    
-    # Initialize session state
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "current_persona" not in st.session_state:
@@ -354,27 +299,17 @@ def main():
         st.session_state.api_key_set = False
     if "audio_enabled" not in st.session_state:
         st.session_state.audio_enabled = True
-    
-    # Sidebar
     with st.sidebar:
         st. markdown("## ⚙️ Settings")
-        
-        # API Key input
-        api_key = st. text_input("Gemini API Key", type="password", 
+        api_key = st. text_input("Gemini API Key", type="password",
                                 help="Get your key from https://makersuite.google.com/app/apikey")
         if api_key:
             genai.configure(api_key=api_key)
             st.session_state.api_key_set = True
             st.success("✅ API Key configured!")
-        
         st.markdown("---")
-        
-        # Audio toggle
         st.session_state.audio_enabled = st.checkbox("🔊 Enable Voice", value=True)
-        
         st.markdown("---")
-        
-        # Manual persona selection
         st.markdown("### 👤 Select Persona Manually")
         persona_options = {
             "auto":  "🔮 Auto-detect from image",
@@ -388,43 +323,29 @@ def main():
             options=list(persona_options.keys()),
             format_func=lambda x: persona_options[x]
         )
-        
         if selected_persona != "auto" and selected_persona != st.session_state.current_persona:
             if st.button("🔄 Switch Persona"):
                 st.session_state.current_persona = selected_persona
                 st.session_state.chat_history = []
                 st.rerun()
-        
         st. markdown("---")
-        
-        # Landmark info
         st.markdown("### 📍 Supported Landmarks")
         for key, landmark in LANDMARKS.items():
             st.markdown(f"• {landmark['name']}")
-        
         st.markdown("---")
-        
-        # Reset button
         if st.button("🔄 Reset Journey"):
             st.session_state.chat_history = []
             st.session_state.current_persona = None
             st.session_state.current_landmark = None
             st.rerun()
-    
-    # Main content area
     col1, col2 = st.columns([1, 1])
-    
     with col1:
         st. markdown("### 📸 Scan a Monument")
-        
-        # Image upload
         uploaded_file = st.file_uploader(
             "Upload an image of a Tirunelveli landmark",
             type=["jpg", "jpeg", "png"],
             help="Take a photo of Nellaiappar Temple, Krishnapuram Palace, or other landmarks"
         )
-        
-        # Demo images
         st.markdown("**Or try a demo:**")
         demo_col1, demo_col2 = st.columns(2)
         with demo_col1:
@@ -433,30 +354,19 @@ def main():
         with demo_col2:
             if st.button("🏰 Demo: Palace"):
                 st.session_state.demo_mode = "palace"
-        
         if uploaded_file:
             image = Image.open(uploaded_file)
             st.image(image, caption="Your captured moment", use_container_width=True)
-            
             if st.session_state.api_key_set:
                 with st.spinner("🔮 The spirits are awakening..."):
-                    # Initialize model
                     model = genai. GenerativeModel('gemini-1.5-flash')
-                    
-                    # Identify landmark
                     identification = identify_landmark(image, model)
-                    
                     st.markdown(f"**Detected:** {identification. get('features', 'Unknown')}")
-                    
-                    # Match to database
                     landmark_key = match_landmark(identification)
-                    
-                    if landmark_key: 
+                    if landmark_key:
                         st.session_state.current_landmark = landmark_key
                         landmark = LANDMARKS[landmark_key]
                         st.success(f"📍 Recognized:  **{landmark['name']}**")
-                        
-                        # Auto-select persona if not manually set
                         if selected_persona == "auto":
                             st.session_state.current_persona = landmark["default_persona"]
                         else:
@@ -467,10 +377,8 @@ def main():
                             st. session_state.current_persona = selected_persona
             else:
                 st.warning("⚠️ Please enter your Gemini API key in the sidebar")
-        
-        # Handle demo mode
         if hasattr(st.session_state, 'demo_mode'):
-            if st.session_state.demo_mode == "temple": 
+            if st.session_state.demo_mode == "temple":
                 st.session_state.current_landmark = "nellaiappar_temple"
                 st. session_state.current_persona = "temple_priest"
                 st.info("🛕 Demo Mode:  Nellaiappar Temple with Temple Priest")
@@ -479,26 +387,17 @@ def main():
                 st.session_state.current_persona = "british_collector"
                 st.info("🏰 Demo Mode: Krishnapuram Palace with British Collector")
             del st.session_state.demo_mode
-    
     with col2:
         st.markdown("### 💬 Speak with History")
-        
-        if st.session_state.current_persona: 
-            # Display current persona
+        if st.session_state.current_persona:
             display_persona_card(st.session_state.current_persona)
-            
-            # Display current landmark if any
             if st.session_state.current_landmark:
                 landmark = LANDMARKS[st.session_state.current_landmark]
                 st.info(f"📍 Location: {landmark['name']}")
-            
-            # Chat interface
             chat_container = st.container()
-            
             with chat_container:
-                # Display chat history
                 for message in st.session_state.chat_history:
-                    if message["role"] == "user": 
+                    if message["role"] == "user":
                         st.markdown(f"""
                         <div class="chat-message user-message">
                             <strong>🧑 You:</strong> {message["content"]}
@@ -511,16 +410,11 @@ def main():
                             <strong>{persona['avatar']} {persona['name']}:</strong> {message["content"]}
                         </div>
                         """, unsafe_allow_html=True)
-            
-            # Initial greeting if no chat history
             if not st.session_state.chat_history and st.session_state.api_key_set:
                 persona = PERSONAS[st.session_state.current_persona]
-                
                 with st.spinner(f"{persona['avatar']} {persona['name']} is awakening..."):
                     model = genai.GenerativeModel('gemini-1.5-flash')
-                    
                     greeting_prompt = "Greet the traveler who just arrived.  Introduce yourself briefly and welcome them to this place.  Keep it to 2-3 sentences."
-                    
                     response = get_persona_response(
                         st.session_state.current_persona,
                         st.session_state.current_landmark,
@@ -528,71 +422,53 @@ def main():
                         model,
                         []
                     )
-                    
                     st.session_state. chat_history.append({
                         "role": "model",
                         "content": response
                     })
-                    
-                    # Play audio
                     if st.session_state.audio_enabled:
                         audio_bytes = text_to_speech(response)
-                        if audio_bytes: 
+                        if audio_bytes:
                             autoplay_audio(audio_bytes)
-                    
                     st.rerun()
-            
-            # User input
             user_input = st.text_input(
                 "Ask a question.. .",
                 placeholder="Why is this temple famous?",
                 key="user_input"
             )
-            
             col_send, col_voice = st.columns([3, 1])
             with col_send:
                 send_button = st.button("📤 Send", use_container_width=True)
             with col_voice:
-                if st.session_state.audio_enabled: 
+                if st.session_state.audio_enabled:
                     st.markdown("🔊 Voice On")
                 else:
                     st.markdown("🔇 Voice Off")
-            
             if send_button and user_input and st.session_state.api_key_set:
-                # Add user message to history
                 st.session_state. chat_history.append({
                     "role": "user",
                     "content": user_input
                 })
-                
                 with st.spinner("✨ Channeling the past..."):
                     model = genai.GenerativeModel('gemini-1.5-flash')
-                    
                     response = get_persona_response(
                         st.session_state. current_persona,
                         st.session_state.current_landmark,
                         user_input,
                         model,
-                        st.session_state.chat_history[:-1]  # Exclude the just-added user message
+                        st.session_state.chat_history[:-1]
                     )
-                    
                     st.session_state.chat_history.append({
                         "role": "model",
                         "content": response
                     })
-                    
-                    # Play audio
                     if st.session_state.audio_enabled:
                         audio_bytes = text_to_speech(response)
                         if audio_bytes:
                             autoplay_audio(audio_bytes)
-                
                 st.rerun()
-            
-            # Suggested questions
             st.markdown("---")
             st.markdown("**💡 Suggested Questions:**")
-            
             suggestions = {
                 "king_rama_pandya": [
                     "What was court life like in your era?",
@@ -615,7 +491,6 @@ def main():
                     "What does freedom mean to you?"
                 ]
             }
-            
             persona_suggestions = suggestions.get(st.session_state.current_persona, [])
             for suggestion in persona_suggestions:
                 if st.button(f"❓ {suggestion}", key=suggestion):
@@ -624,7 +499,6 @@ def main():
                         "content": suggestion
                     })
                     st.rerun()
-        
         else:
             st.markdown("""
             <div style="text-align: center; padding: 50px; color: #a0a0a0;">
@@ -632,8 +506,6 @@ def main():
                 <p>Or select a persona manually from the sidebar to begin your journey</p>
             </div>
             """, unsafe_allow_html=True)
-    
-    # Footer
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #666;">
@@ -641,6 +513,5 @@ def main():
         <p>Powered by Google Gemini AI | Made with ❤️ for Tirunelveli</p>
     </div>
     """, unsafe_allow_html=True)
-
-if __name__ == "__main__": 
+if __name__ == "__main__":
     main()
