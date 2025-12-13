@@ -12,6 +12,7 @@ PERSONAS = {
         "region": "Tamil Nadu",
         "avatar": "👑",
         "avatar_image": "https://i.imgur.com/KxYbNQe.png",  # Placeholder - royal figure
+        "wikipedia_search": "Pandya dynasty Tamil Nadu",
         "max_knowledge_year": 1500,
         "voice":  {
             "engine": "edge-tts",
@@ -59,6 +60,7 @@ HISTORICAL KNOWLEDGE:
         "region":  "Tamil Nadu",
         "avatar": "🙏",
         "avatar_image": "https://i.imgur.com/QxR8vZN.png",
+        "wikipedia_search": "Hindu priest Tamil temple",
         "max_knowledge_year": 1800,
         "voice": {
             "engine": "edge-tts",
@@ -106,6 +108,7 @@ HISTORICAL KNOWLEDGE:
         "region":  "Tamil Nadu",
         "avatar": "🎩",
         "avatar_image": "https://i.imgur.com/WvR3kZL.png",
+        "wikipedia_search": "British East India Company collector",
         "max_knowledge_year": 1850,
         "voice": {
             "engine": "edge-tts",
@@ -153,6 +156,7 @@ HISTORICAL KNOWLEDGE:
         "region":  "Tamil Nadu",
         "avatar": "⚔️",
         "avatar_image": "https://i.imgur.com/Y8xMkVH.png",
+        "wikipedia_search": "Veerapandiya Kattabomman",
         "max_knowledge_year": 1799,
         "voice": {
             "engine": "edge-tts",
@@ -201,6 +205,7 @@ HISTORICAL KNOWLEDGE:
         "region":  "Tamil Nadu",
         "avatar": "👸",
         "avatar_image": "https://i.imgur.com/Z9xMkVH.png",
+        "wikipedia_search": "Velu Nachiyar",
         "max_knowledge_year": 1796,
         "voice": {
             "engine": "edge-tts",
@@ -248,6 +253,7 @@ HISTORICAL KNOWLEDGE:
         "region": "Egypt",
         "avatar": "🏺",
         "avatar_image":  "https://i.imgur.com/CleopatraPlaceholder.png",
+        "wikipedia_search": "Cleopatra",
         "max_knowledge_year": -30,
         "voice": {
             "engine": "edge-tts",
@@ -292,6 +298,7 @@ HISTORICAL KNOWLEDGE:
         "region": "Italy",
         "avatar": "🎨",
         "avatar_image": "https://i.imgur.com/DaVinciPlaceholder.png",
+        "wikipedia_search": "Leonardo da Vinci",
         "max_knowledge_year":  1519,
         "voice": {
             "engine": "edge-tts",
@@ -336,6 +343,7 @@ HISTORICAL KNOWLEDGE:
         "region": "India",
         "avatar": "☸️",
         "avatar_image": "https://i.imgur.com/AshokaPlaceholder.png",
+        "wikipedia_search": "Ashoka Maurya",
         "max_knowledge_year": -232,
         "voice": {
             "engine": "edge-tts",
@@ -380,6 +388,7 @@ HISTORICAL KNOWLEDGE:
         "region": "Poland/France",
         "avatar": "⚗️",
         "avatar_image": "https://i.imgur.com/CuriePlaceholder.png",
+        "wikipedia_search": "Marie Curie",
         "max_knowledge_year": 1934,
         "voice": {
             "engine": "edge-tts",
@@ -424,6 +433,7 @@ HISTORICAL KNOWLEDGE:
         "region": "Tamil Nadu",
         "avatar": "🦁",
         "avatar_image":  "https://i.imgur.com/CholaPlaceholder.png",
+        "wikipedia_search": "Rajendra Chola",
         "max_knowledge_year":  1044,
         "voice": {
             "engine": "edge-tts",
