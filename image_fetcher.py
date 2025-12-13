@@ -186,10 +186,8 @@ def fetch_landmark_images(landmark_key: str, landmark_data: Dict) -> List[Dict]:
         landmark_data: Landmark data dict
         
     Returns:
-        List of image dicts with 'url' and 'caption' keys
-    
-    Raises:
-        Exception: If image fetching fails critically
+        List of image dicts with 'url' and 'caption' keys.
+        Returns fallback images if Wikipedia search fails.
     """
     init_image_cache()
     
