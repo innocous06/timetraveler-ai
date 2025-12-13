@@ -7,79 +7,53 @@ import asyncio
 import edge_tts
 import base64
 from io import BytesIO
-import tempfile
-import os
-from typing import Optional, Dict
-import streamlit as st
+from typing import Optional
+import time
 
 # Voice presets for different character types
 VOICE_PRESETS = {
     # Indian voices
     "indian_male_royal": {
         "voice":  "en-IN-PrabhatNeural",
-        "rate": "-15%",
+        "rate":  "-15%",
         "pitch": "-10Hz",
-        "description": "Deep, commanding voice for kings and emperors"
+        "description": "Deep, commanding voice for kings"
     },
     "indian_male_spiritual": {
         "voice": "en-IN-PrabhatNeural",
         "rate": "-20%",
         "pitch": "+5Hz",
-        "description":  "Gentle, wise voice for priests and sages"
+        "description": "Gentle, wise voice for priests"
     },
     "indian_male_warrior": {
         "voice": "en-IN-PrabhatNeural",
         "rate": "+5%",
-        "pitch": "-5Hz",
-        "description":  "Passionate, fierce voice for warriors"
+        "pitch":  "-5Hz",
+        "description": "Passionate voice for warriors"
     },
     "indian_female_royal": {
         "voice": "en-IN-NeerjaNeural",
-        "rate":  "-10%",
-        "pitch": "+5Hz",
-        "description":  "Regal, commanding female voice"
+        "rate": "-10%",
+        "pitch": "+3Hz",
+        "description": "Regal female voice"
     },
-    "indian_female_gentle": {
-        "voice": "en-IN-NeerjaNeural",
-        "rate": "-15%",
-        "pitch":  "+8Hz",
-        "description": "Soft, nurturing female voice"
-    },
-    
-    # British voices
     "british_male_formal": {
         "voice": "en-GB-RyanNeural",
-        "rate":  "-5%",
+        "rate": "-5%",
         "pitch": "-3Hz",
-        "description": "Formal British colonial officer"
+        "description": "Formal British officer"
     },
-    "british_female_educated": {
+    "british_female":  {
         "voice": "en-GB-SoniaNeural",
         "rate": "-5%",
         "pitch": "+2Hz",
-        "description":  "Educated British female"
+        "description":  "British female"
     },
-    
-    # American voices
-    "american_female_professional": {
-        "voice": "en-US-JennyNeural",
+    "american_female":  {
+        "voice": "en-US-AriaNeural",
         "rate": "-5%",
-        "pitch":  "+3Hz",
-        "description": "Professional American female"
-    },
-    "american_male_narrator": {
-        "voice": "en-US-GuyNeural",
-        "rate": "-10%",
-        "pitch": "-5Hz",
-        "description": "Deep narrator voice"
-    },
-    
-    # European voices
-    "italian_male_artistic": {
-        "voice": "en-GB-RyanNeural",  # Using British as fallback
-        "rate": "-15%",
-        "pitch": "-2Hz",
-        "description": "Thoughtful artistic voice"
+        "pitch": "+3Hz",
+        "description": "American female"
     },
 }
 
@@ -87,37 +61,35 @@ VOICE_PRESETS = {
 PERSONA_VOICE_MAP = {
     "king_rama_pandya": "indian_male_royal",
     "temple_priest": "indian_male_spiritual",
-    "british_collector": "british_male_formal",
+    "british_collector":  "british_male_formal",
     "freedom_fighter": "indian_male_warrior",
     "rani_velu_nachiyar": "indian_female_royal",
-    "cleopatra": "american_female_professional",  # Fallback
-    "leonardo_da_vinci": "italian_male_artistic",
+    "cleopatra":  "american_female",
+    "leonardo_da_vinci": "british_male_formal",
     "emperor_ashoka": "indian_male_royal",
-    "marie_curie": "british_female_educated",
+    "marie_curie": "british_female",
     "chola_king": "indian_male_royal",
 }
 
 
-async def generate_speech_async(
+async def _generate_speech_async(
     text: str,
-    voice:  str = "en-IN-PrabhatNeural",
-    rate: str = "-10%",
-    pitch: str = "-5Hz"
+    voice:  str,
+    rate: str,
+    pitch: str
 ) -> Optional[bytes]:
-    """
-    Generate speech audio using Edge-TTS asynchronously.
-    Returns audio bytes. 
-    """
-    try: 
-        # Clean text for better speech
+    """Generate speech using Edge-TTS asynchronously."""
+    try:
+        # Clean text
         clean_text = text.replace("*", "").replace("_", "").replace("#", "")
         clean_text = clean_text.replace("**", "").replace("__", "")
         
-        # Limit length
-        if len(clean_text) > 5000:
-            clean_text = clean_text[:5000] + "..."
+        if len(clean_text) > 3000:
+            clean_text = clean_text[:3000] + "..."
         
-        # Create communicate object with voice settings
+        if not clean_text. strip():
+            return None
+        
         communicate = edge_tts.Communicate(
             text=clean_text,
             voice=voice,
@@ -125,17 +97,16 @@ async def generate_speech_async(
             pitch=pitch
         )
         
-        # Generate audio to bytes
         audio_bytes = BytesIO()
         
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 audio_bytes.write(chunk["data"])
         
-        audio_bytes.seek(0)
+        audio_bytes. seek(0)
         return audio_bytes.read()
     
-    except Exception as e: 
+    except Exception as e:
         print(f"Edge-TTS Error: {e}")
         return None
 
@@ -146,33 +117,28 @@ def generate_speech(
     rate: str = "-10%",
     pitch: str = "-5Hz"
 ) -> Optional[bytes]:
-    """
-    Synchronous wrapper for speech generation.
-    """
+    """Synchronous wrapper for speech generation."""
     try:
-        # Run async function
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop. run_until_complete(
-            generate_speech_async(text, voice, rate, pitch)
+            _generate_speech_async(text, voice, rate, pitch)
         )
         loop.close()
         return result
     except Exception as e:
-        print(f"Speech generation error: {e}")
+        print(f"Speech error: {e}")
         return None
 
 
-def generate_persona_speech(text: str, persona_key: str) -> Optional[str]:
+def generate_persona_speech(text: str, persona_key:  str) -> Optional[str]:
     """
-    Generate speech for a specific persona with their voice settings.
+    Generate speech for a specific persona. 
     Returns base64 encoded audio.
     """
-    # Get voice preset for persona
     preset_name = PERSONA_VOICE_MAP.get(persona_key, "indian_male_royal")
     preset = VOICE_PRESETS. get(preset_name, VOICE_PRESETS["indian_male_royal"])
     
-    # Generate speech
     audio_bytes = generate_speech(
         text=text,
         voice=preset["voice"],
@@ -185,24 +151,39 @@ def generate_persona_speech(text: str, persona_key: str) -> Optional[str]:
     return None
 
 
-def get_audio_player_html(
-    b64_audio: str,
-    autoplay: bool = True,
-    show_controls: bool = True
-) -> str:
-    """
-    Create HTML audio player from base64 audio.
-    """
+def get_audio_player_html(b64_audio: str, autoplay: bool = True) -> str:
+    """Create HTML audio player from base64 audio."""
     if not b64_audio:
         return ""
     
-    import time
     unique_id = f"audio_{int(time.time() * 1000)}"
-    
-    controls_attr = "controls" if show_controls else ""
     autoplay_attr = "autoplay" if autoplay else ""
     
     html = f"""
-    <div style="margin:  15px 0;">
-        <audio id="{unique_id}" {autoplay_attr} {controls_attr} 
-               style="
+    <audio id="{unique_id}" {autoplay_attr} controls 
+           style="width: 100%; margin: 10px 0; border-radius: 25px;">
+        <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+    </audio>
+    <script>
+        (function() {{
+            var audio = document.getElementById('{unique_id}');
+            if (audio) {{
+                audio.play().catch(function(e) {{ console.log('Autoplay blocked'); }});
+            }}
+        }})();
+    </script>
+    """
+    return html
+
+
+def get_available_voices():
+    """List all available Edge-TTS voices."""
+    async def _list_voices():
+        voices = await edge_tts.list_voices()
+        return voices
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    voices = loop.run_until_complete(_list_voices())
+    loop.close()
+    return voices
