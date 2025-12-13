@@ -17,6 +17,8 @@ from utils import (
 )
 from voice_engine import generate_persona_speech, get_audio_player_html
 from presentation_mode import create_mini_presentation, get_presentation_css
+from image_fetcher import fetch_landmark_images, init_image_cache
+from immersive_view import render_immersive_view
 
 # ============== PAGE CONFIG ==============
 st.set_page_config(
@@ -219,13 +221,16 @@ def init_session_state():
         "model":  None,
         "greeted": False,
         "presentation_mode": False,
+        "immersive_mode": False,
         "current_image_index": 0,
+        "landmark_images": [],
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 init_session_state()
+init_image_cache()
 
 
 # ============== SIDEBAR ==============
@@ -267,6 +272,16 @@ def render_sidebar():
         
         st.markdown("---")
         
+        # Immersive Mode Toggle
+        st.markdown("### 🎬 Immersive Experience")
+        st.session_state.immersive_mode = st.checkbox(
+            "Enable Immersive Mode",
+            value=st.session_state.immersive_mode,
+            help="Fullscreen cinematic experience with slideshow and animations"
+        )
+        
+        st.markdown("---")
+        
         # Region Selection
         st.markdown("### 🌍 Select Region")
         region = st.selectbox(
@@ -298,6 +313,7 @@ def render_sidebar():
                 st.session_state.current_persona = persona
                 st.session_state.chat_history = []
                 st. session_state.greeted = False
+                st.session_state.landmark_images = []
                 st.rerun()
         
         st. markdown("---")
@@ -318,14 +334,15 @@ def render_sidebar():
                 st.session_state.current_persona = selected
                 st. session_state.chat_history = []
                 st.session_state.greeted = False
+                st.session_state.landmark_images = []
                 st.rerun()
         
         st.markdown("---")
         
         # Reset
         if st.button("🔄 New Journey", use_container_width=True):
-            for key in ["chat_history", "current_persona", "current_landmark", "greeted"]:
-                st.session_state[key] = [] if key == "chat_history" else None if key != "greeted" else False
+            for key in ["chat_history", "current_persona", "current_landmark", "greeted", "landmark_images"]:
+                st.session_state[key] = [] if key in ["chat_history", "landmark_images"] else None if key != "greeted" else False
             st.rerun()
         
         st.markdown("---")
@@ -378,6 +395,7 @@ with col_left:
                         st.session_state.current_persona = landmark["default_persona"]
                         st. session_state.chat_history = []
                         st.session_state.greeted = False
+                        st.session_state.landmark_images = []
                         st.rerun()
                     else:
                         st. warning("Landmark not in database. Try selecting a persona manually!")
@@ -420,6 +438,14 @@ with col_right:
         </div>
         """, unsafe_allow_html=True)
         
+        # Fetch landmark images if needed
+        if landmark and not st.session_state.landmark_images:
+            with st.spinner("🖼️ Loading images..."):
+                st.session_state.landmark_images = fetch_landmark_images(
+                    st.session_state.current_landmark, 
+                    landmark
+                )
+        
         # Generate greeting
         if not st.session_state.greeted and st.session_state.api_configured:
             with st.spinner(f"✨ {persona['name']} is awakening..."):
@@ -446,15 +472,36 @@ with col_right:
             if msg["role"] == "user":
                 st.markdown(f'<div class="chat-user"><strong>🧑 You:</strong><br>{msg["content"]}</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="chat-ai"><strong>{persona["avatar"]} {persona["name"]}:</strong><br>{msg["content"]}</div>', unsafe_allow_html=True)
+                is_latest = (i == len(st.session_state.chat_history) - 1)
                 
-                # Audio player
-                if st.session_state.audio_enabled and msg. get("audio"):
-                    is_latest = (i == len(st.session_state.chat_history) - 1)
-                    st.markdown(
-                        f'<div class="audio-container">{get_audio_player_html(msg["audio"], autoplay=is_latest)}</div>',
-                        unsafe_allow_html=True
+                # Show immersive view for latest message if immersive mode is on
+                if is_latest and st.session_state.immersive_mode and st.session_state.landmark_images:
+                    render_immersive_view(
+                        images=st.session_state.landmark_images,
+                        persona_data=persona,
+                        subtitle_text=msg["content"],
+                        current_index=st.session_state.current_image_index,
+                        show_audio_visualizer=st.session_state.audio_enabled and msg.get("audio") is not None
                     )
+                else:
+                    # Regular chat display
+                    st.markdown(f'<div class="chat-ai"><strong>{persona["avatar"]} {persona["name"]}:</strong><br>{msg["content"]}</div>', unsafe_allow_html=True)
+                    
+                    # Audio player
+                    if st.session_state.audio_enabled and msg. get("audio"):
+                        st.markdown(
+                            f'<div class="audio-container">{get_audio_player_html(msg["audio"], autoplay=is_latest)}</div>',
+                            unsafe_allow_html=True
+                        )
+                    
+                    # Mini presentation with images for non-immersive mode
+                    if is_latest and landmark and st.session_state.landmark_images:
+                        st.markdown("---")
+                        st.markdown("**📷 Image Gallery:**")
+                        cols = st.columns(min(len(st.session_state.landmark_images), 4))
+                        for idx, img in enumerate(st.session_state.landmark_images[:4]):
+                            with cols[idx]:
+                                st.image(img["url"], caption=img["caption"], use_container_width=True)
         
         # Chat Input
         st.markdown("---")
