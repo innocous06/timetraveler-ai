@@ -528,4 +528,4 @@ def render_immersive_view(
         show_audio_visualizer=show_audio_visualizer
     )
     
-    components.html(html, height=800, scrolling=False)
+    components.html(html, height=None, scrolling=False)

@@ -8,21 +8,22 @@ import streamlit as st
 from typing import List, Dict, Optional
 import urllib.parse
 import re
+import time
 
 
 # Wikipedia API endpoint
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 
-# Unsplash fallback URLs (free to use)
-UNSPLASH_FALLBACKS = {
-    "temple": "https://source.unsplash.com/800x600/?indian,temple,architecture",
-    "palace": "https://source.unsplash.com/800x600/?palace,architecture,historical",
-    "fort": "https://source.unsplash.com/800x600/?fort,castle,historical",
-    "monument": "https://source.unsplash.com/800x600/?monument,historical,architecture",
-    "pyramid": "https://source.unsplash.com/800x600/?pyramid,egypt,ancient",
-    "rome": "https://source.unsplash.com/800x600/?rome,colosseum,ancient",
-    "taj": "https://source.unsplash.com/800x600/?taj,mahal,india",
-    "stupa": "https://source.unsplash.com/800x600/?stupa,buddhist,temple",
+# Placeholder fallback URLs (using picsum.photos which is reliable)
+PLACEHOLDER_FALLBACKS = {
+    "temple": "https://picsum.photos/800/600?random=1",
+    "palace": "https://picsum.photos/800/600?random=2",
+    "fort": "https://picsum.photos/800/600?random=3",
+    "monument": "https://picsum.photos/800/600?random=4",
+    "pyramid": "https://picsum.photos/800/600?random=5",
+    "rome": "https://picsum.photos/800/600?random=6",
+    "taj": "https://picsum.photos/800/600?random=7",
+    "stupa": "https://picsum.photos/800/600?random=8",
 }
 
 
@@ -63,6 +64,7 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
         response = requests.get(WIKIPEDIA_API_URL, params=search_params, timeout=10)
         response.raise_for_status()
         data = response.json()
+        time.sleep(0.2)
         
         if not data.get("query", {}).get("search"):
             return []
@@ -81,6 +83,7 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
         response = requests.get(WIKIPEDIA_API_URL, params=image_params, timeout=10)
         response.raise_for_status()
         data = response.json()
+        time.sleep(0.2)
         
         pages = data.get("query", {}).get("pages", {})
         page = next(iter(pages.values()), {})
@@ -111,6 +114,7 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
             response = requests.get(WIKIPEDIA_API_URL, params=info_params, timeout=10)
             response.raise_for_status()
             info_data = response.json()
+            time.sleep(0.2)
             
             info_pages = info_data.get("query", {}).get("pages", {})
             info_page = next(iter(info_pages.values()), {})
@@ -150,7 +154,7 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
 
 def get_fallback_images(category: str = "monument", count: int = 3) -> List[Dict]:
     """
-    Get fallback images from Unsplash.
+    Get fallback images from placeholder service.
     
     Args:
         category: Category of images (temple, palace, fort, etc.)
@@ -159,7 +163,7 @@ def get_fallback_images(category: str = "monument", count: int = 3) -> List[Dict
     Returns:
         List of dicts with 'url' and 'caption' keys
     """
-    base_url = UNSPLASH_FALLBACKS.get(category, UNSPLASH_FALLBACKS["monument"])
+    base_url = PLACEHOLDER_FALLBACKS.get(category, PLACEHOLDER_FALLBACKS["monument"])
     
     images = []
     for i in range(count):
@@ -183,27 +187,37 @@ def fetch_landmark_images(landmark_key: str, landmark_data: Dict) -> List[Dict]:
         
     Returns:
         List of image dicts with 'url' and 'caption' keys
+    
+    Raises:
+        Exception: If image fetching fails critically
     """
     init_image_cache()
     
-    # Check if images already exist in landmark data
-    if landmark_data.get("gallery_images"):
-        existing = landmark_data["gallery_images"]
-        if existing and all(img.get("url") for img in existing):
-            return existing
-    
-    # Try Wikipedia search
-    search_term = landmark_data.get("wikipedia_search") or landmark_data.get("name")
-    images = search_wikipedia_images(search_term, limit=5)
+    try:
+        # Check if images already exist in landmark data
+        if landmark_data.get("gallery_images"):
+            existing = landmark_data["gallery_images"]
+            if existing and all(img.get("url") for img in existing):
+                return existing
+        
+        # Try Wikipedia search
+        search_term = landmark_data.get("wikipedia_search") or landmark_data.get("name")
+        images = search_wikipedia_images(search_term, limit=5)
+    except Exception as e:
+        print(f"Wikipedia image fetch error for '{landmark_key}': {e}")
+        images = []
     
     # If not enough images, try alternate search terms
     if len(images) < 3:
-        # Try with location
-        location = landmark_data.get("location", "")
-        if location:
-            alt_search = f"{search_term} {location}"
-            more_images = search_wikipedia_images(alt_search, limit=3)
-            images.extend(more_images)
+        try:
+            # Try with location
+            location = landmark_data.get("location", "")
+            if location:
+                alt_search = f"{search_term} {location}"
+                more_images = search_wikipedia_images(alt_search, limit=3)
+                images.extend(more_images)
+        except Exception as e:
+            print(f"Alternate search failed for '{landmark_key}': {e}")
     
     # Remove duplicates
     seen_urls = set()

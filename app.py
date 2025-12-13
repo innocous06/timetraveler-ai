@@ -236,7 +236,7 @@ init_image_cache()
 # ============== SIDEBAR ==============
 def render_sidebar():
     with st.sidebar:
-        st. markdown("## ⚙️ Control Panel")
+        st.markdown("## ⚙️ Control Panel")
         
         # API Configuration
         st.markdown("### 🔑 API Key")
@@ -251,7 +251,7 @@ def render_sidebar():
         if api_key: 
             try:
                 configure_gemini(api_key)
-                st.session_state. model = get_gemini_model()
+                st.session_state.model = get_gemini_model()
                 st.session_state.api_configured = True
                 st.caption(f"📦 Model: `{DEFAULT_MODEL}`")
             except Exception as e:
@@ -312,11 +312,11 @@ def render_sidebar():
                 st.session_state.current_landmark = landmark
                 st.session_state.current_persona = persona
                 st.session_state.chat_history = []
-                st. session_state.greeted = False
+                st.session_state.greeted = False
                 st.session_state.landmark_images = []
                 st.rerun()
         
-        st. markdown("---")
+        st.markdown("---")
         
         # Manual Persona Selection
         st.markdown("### 👤 Choose Guide")
@@ -326,13 +326,13 @@ def render_sidebar():
         selected = st.selectbox(
             "Historical Figure:",
             options=list(persona_options.keys()),
-            format_func=lambda x: persona_options. get(x, x)
+            format_func=lambda x: persona_options.get(x, x)
         )
         
         if selected and selected != st.session_state.current_persona:
             if st.button("🎭 Activate", use_container_width=True):
                 st.session_state.current_persona = selected
-                st. session_state.chat_history = []
+                st.session_state.chat_history = []
                 st.session_state.greeted = False
                 st.session_state.landmark_images = []
                 st.rerun()
@@ -341,8 +341,11 @@ def render_sidebar():
         
         # Reset
         if st.button("🔄 New Journey", use_container_width=True):
-            for key in ["chat_history", "current_persona", "current_landmark", "greeted", "landmark_images"]:
-                st.session_state[key] = [] if key in ["chat_history", "landmark_images"] else None if key != "greeted" else False
+            st.session_state.chat_history = []
+            st.session_state.current_persona = None
+            st.session_state.current_landmark = None
+            st.session_state.greeted = False
+            st.session_state.landmark_images = []
             st.rerun()
         
         st.markdown("---")
@@ -382,10 +385,10 @@ with col_left:
                 with st.spinner("🔮 Analyzing monument..."):
                     analysis = analyze_image(image, st.session_state.model)
                     
-                    st.info(f"**Detected:** {analysis. get('visual_elements', 'Processing...')}")
+                    st.info(f"**Detected:** {analysis.get('visual_elements', 'Processing...')}")
                     
                     if analysis.get("identified"):
-                        st.success(f"**{analysis. get('landmark_name')}** - {analysis.get('location', 'Unknown')}")
+                        st.success(f"**{analysis.get('landmark_name')}** - {analysis.get('location', 'Unknown')}")
                     
                     landmark_key = match_to_database(analysis)
                     
@@ -393,12 +396,12 @@ with col_left:
                         landmark = get_landmark(landmark_key)
                         st.session_state.current_landmark = landmark_key
                         st.session_state.current_persona = landmark["default_persona"]
-                        st. session_state.chat_history = []
+                        st.session_state.chat_history = []
                         st.session_state.greeted = False
                         st.session_state.landmark_images = []
                         st.rerun()
                     else:
-                        st. warning("Landmark not in database. Try selecting a persona manually!")
+                        st.warning("Landmark not in database. Try selecting a persona manually!")
     
     # Current landmark info
     if st.session_state.current_landmark:
@@ -417,7 +420,7 @@ with col_left:
                         st.image(img["url"], caption=img["caption"], use_container_width=True)
             
             with st.expander("📜 Historical Details"):
-                st.markdown(landmark. get("historical_context", ""))
+                st.markdown(landmark.get("historical_context", ""))
 
 
 # ============== RIGHT COLUMN ==============
@@ -434,17 +437,21 @@ with col_right:
             <div class="persona-avatar">{persona['avatar']}</div>
             <div class="persona-name">{persona['name']}</div>
             <div class="persona-title">{persona['title']}</div>
-            <div class="persona-era">Era: {persona['era']} • {persona. get('region', 'Unknown')}</div>
+            <div class="persona-era">Era: {persona['era']} • {persona.get('region', 'Unknown')}</div>
         </div>
         """, unsafe_allow_html=True)
         
         # Fetch landmark images if needed
         if landmark and not st.session_state.landmark_images:
-            with st.spinner("🖼️ Loading images..."):
-                st.session_state.landmark_images = fetch_landmark_images(
-                    st.session_state.current_landmark, 
-                    landmark
-                )
+            try:
+                with st.spinner("🖼️ Loading images..."):
+                    st.session_state.landmark_images = fetch_landmark_images(
+                        st.session_state.current_landmark, 
+                        landmark
+                    )
+            except Exception as e:
+                st.warning(f"⚠️ Could not load images: {e}")
+                st.session_state.landmark_images = []
         
         # Generate greeting
         if not st.session_state.greeted and st.session_state.api_configured:
@@ -468,7 +475,7 @@ with col_right:
                 st.session_state.greeted = True
         
         # Chat History
-        for i, msg in enumerate(st. session_state.chat_history):
+        for i, msg in enumerate(st.session_state.chat_history):
             if msg["role"] == "user":
                 st.markdown(f'<div class="chat-user"><strong>🧑 You:</strong><br>{msg["content"]}</div>', unsafe_allow_html=True)
             else:
@@ -488,7 +495,7 @@ with col_right:
                     st.markdown(f'<div class="chat-ai"><strong>{persona["avatar"]} {persona["name"]}:</strong><br>{msg["content"]}</div>', unsafe_allow_html=True)
                     
                     # Audio player
-                    if st.session_state.audio_enabled and msg. get("audio"):
+                    if st.session_state.audio_enabled and msg.get("audio"):
                         st.markdown(
                             f'<div class="audio-container">{get_audio_player_html(msg["audio"], autoplay=is_latest)}</div>',
                             unsafe_allow_html=True
@@ -507,13 +514,13 @@ with col_right:
         st.markdown("---")
         
         with st.form(key="chat_form", clear_on_submit=True):
-            user_input = st. text_input(
+            user_input = st.text_input(
                 "Ask your question:",
                 placeholder="What was life like in your time?",
                 label_visibility="collapsed"
             )
             
-            col1, col2 = st. columns([4, 1])
+            col1, col2 = st.columns([4, 1])
             with col1:
                 submitted = st.form_submit_button("📤 Send", use_container_width=True)
             with col2:
@@ -528,7 +535,7 @@ with col_right:
             
             with st.spinner("✨ Channeling the past..."):
                 response = generate_persona_response(
-                    st. session_state.current_persona,
+                    st.session_state.current_persona,
                     st.session_state.current_landmark,
                     user_input,
                     [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history[:-1]],
@@ -539,7 +546,7 @@ with col_right:
                 if st.session_state.audio_enabled:
                     audio_b64 = generate_persona_speech(response, st.session_state.current_persona)
                 
-                st.session_state. chat_history.append({
+                st.session_state.chat_history.append({
                     "role": "assistant",
                     "content": response,
                     "audio": audio_b64
@@ -560,13 +567,13 @@ with col_right:
         for i, (col, suggestion) in enumerate(zip(cols, suggestions)):
             with col:
                 if st.button(f"❓", key=f"sug_{i}", help=suggestion):
-                    st. session_state.chat_history.append({
+                    st.session_state.chat_history.append({
                         "role": "user", "content": suggestion, "audio": None
                     })
                     
                     with st.spinner("✨"):
                         response = generate_persona_response(
-                            st. session_state.current_persona,
+                            st.session_state.current_persona,
                             st.session_state.current_landmark,
                             suggestion,
                             [{"role": m["role"], "content":  m["content"]} for m in st.session_state.chat_history[:-1]],
