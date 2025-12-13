@@ -7,6 +7,7 @@ import requests
 import streamlit as st
 from typing import List, Dict, Optional
 import urllib.parse
+import re
 
 
 # Wikipedia API endpoint
@@ -123,7 +124,6 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
                     caption = extmetadata.get("ObjectName", {}).get("value", img_title)
                 
                 # Clean HTML from caption
-                import re
                 caption = re.sub('<[^<]+?>', '', caption)
                 caption = caption[:100] if len(caption) > 100 else caption
                 
