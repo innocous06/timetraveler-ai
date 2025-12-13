@@ -1,8 +1,5 @@
-# Add to imports
 import requests
-
 def elevenlabs_tts(text, api_key, voice_id="21m00Tcm4TlvDq8ikWAM"):
-    """Use ElevenLabs for more realistic voice synthesis."""
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
         "xi-api-key": api_key,
