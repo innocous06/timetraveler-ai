@@ -317,6 +317,8 @@ def render_sidebar():
                 st.session_state.chat_history = []
                 st.session_state.greeted = False
                 st.session_state.landmark_images = []
+                st.session_state.dynamic_persona_data = None
+                st.session_state.dynamic_persona_voice = None
                 st.rerun()
         
         st.markdown("---")
@@ -338,6 +340,8 @@ def render_sidebar():
                 st.session_state.chat_history = []
                 st.session_state.greeted = False
                 st.session_state.landmark_images = []
+                st.session_state.dynamic_persona_data = None
+                st.session_state.dynamic_persona_voice = None
                 st.rerun()
         
         st.markdown("---")
@@ -349,6 +353,8 @@ def render_sidebar():
             st.session_state.current_landmark = None
             st.session_state.greeted = False
             st.session_state.landmark_images = []
+            st.session_state.dynamic_persona_data = None
+            st.session_state.dynamic_persona_voice = None
             st.rerun()
         
         st.markdown("---")
