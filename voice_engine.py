@@ -1,110 +1,132 @@
 """
-Advanced Voice Engine for TimeTraveler AI. 
-Uses Edge-TTS for free, high-quality, customizable voices.
+Voice Engine for TimeTraveler AI.
+Uses Edge-TTS for character-appropriate voices.
 """
 
 import asyncio
 import edge_tts
 import base64
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Dict
 import time
 
-# Voice presets for different character types
+
+# Voice presets based on characteristics
 VOICE_PRESETS = {
     # Indian voices
     "indian_male_royal": {
         "voice":  "en-IN-PrabhatNeural",
-        "rate":  "-15%",
-        "pitch": "-10Hz",
-        "description": "Deep, commanding voice for kings"
+        "rate": "-15%",
+        "pitch": "-10Hz"
     },
-    "indian_male_spiritual": {
+    "indian_male_old": {
         "voice": "en-IN-PrabhatNeural",
         "rate": "-20%",
-        "pitch": "+5Hz",
-        "description": "Gentle, wise voice for priests"
+        "pitch": "-5Hz"
     },
-    "indian_male_warrior": {
-        "voice": "en-IN-PrabhatNeural",
-        "rate": "+5%",
-        "pitch":  "-5Hz",
-        "description": "Passionate voice for warriors"
-    },
-    "indian_female_royal": {
+    "indian_female":  {
         "voice": "en-IN-NeerjaNeural",
         "rate": "-10%",
-        "pitch": "+3Hz",
-        "description": "Regal female voice"
+        "pitch": "+5Hz"
     },
-    "british_male_formal": {
+    # British/European voices
+    "british_male":  {
         "voice": "en-GB-RyanNeural",
-        "rate": "-5%",
-        "pitch": "-3Hz",
-        "description": "Formal British officer"
+        "rate":  "-5%",
+        "pitch": "-3Hz"
     },
-    "british_female":  {
+    "british_female": {
         "voice": "en-GB-SoniaNeural",
         "rate": "-5%",
-        "pitch": "+2Hz",
-        "description":  "British female"
+        "pitch": "+2Hz"
     },
-    "american_female":  {
-        "voice": "en-US-AriaNeural",
+    # American voices (fallback)
+    "american_male": {
+        "voice": "en-US-GuyNeural",
+        "rate": "-10%",
+        "pitch": "-5Hz"
+    },
+    "american_female": {
+        "voice": "en-US-JennyNeural",
         "rate": "-5%",
-        "pitch": "+3Hz",
-        "description": "American female"
+        "pitch": "+3Hz"
+    },
+    # Arabic/Middle Eastern style (using British as base)
+    "middle_eastern_male": {
+        "voice": "en-GB-RyanNeural",
+        "rate":  "-15%",
+        "pitch": "-8Hz"
     },
 }
 
-# Map personas to voice presets
+# Persona to voice mapping for preset personas
 PERSONA_VOICE_MAP = {
     "king_rama_pandya": "indian_male_royal",
-    "temple_priest": "indian_male_spiritual",
-    "british_collector":  "british_male_formal",
-    "freedom_fighter": "indian_male_warrior",
-    "rani_velu_nachiyar": "indian_female_royal",
-    "cleopatra":  "american_female",
-    "leonardo_da_vinci": "british_male_formal",
+    "temple_priest": "indian_male_old",
+    "british_collector": "british_male",
+    "freedom_fighter": "indian_male_royal",
+    "rani_velu_nachiyar": "indian_female",
+    "cleopatra": "british_female",
+    "leonardo_da_vinci": "british_male",
     "emperor_ashoka": "indian_male_royal",
     "marie_curie": "british_female",
     "chola_king": "indian_male_royal",
 }
 
-# Regional keywords for voice selection
-INDIAN_REGIONS = ["india", "tamil", "bengal", "delhi", "mughal", "chola", "pandya"]
-BRITISH_REGIONS = ["britain", "england", "british", "uk", "london"]
-EGYPTIAN_REGIONS = ["egypt", "africa", "alexandria"]
-EUROPEAN_REGIONS = ["europe", "italy", "france", "spain", "rome"]
 
-# Gender/role keywords for voice selection
-FEMALE_TITLES = ["queen", "rani", "empress", "princess", "lady", "duchess", "marie", "cleopatra"]
-MALE_ROYAL_TITLES = ["king", "emperor", "warrior", "general"]
-SPIRITUAL_TITLES = ["priest", "monk", "spiritual"]
+def get_voice_settings_for_dynamic_persona(persona:  Dict) -> Dict:
+    """
+    Generate voice settings based on dynamic persona characteristics.
+    """
+    region = persona.get("region", "").lower()
+    gender = persona.get("voice_gender", "male").lower()
+    age = persona.get("voice_age", "middle").lower()
+    
+    # Determine voice based on region and gender
+    if any(r in region for r in ["india", "mughal", "delhi", "agra", "tamil", "bengal"]):
+        if gender == "female":
+            return VOICE_PRESETS["indian_female"]
+        else: 
+            if age == "old":
+                return VOICE_PRESETS["indian_male_old"]
+            else:
+                return VOICE_PRESETS["indian_male_royal"]
+    
+    elif any(r in region for r in ["egypt", "persia", "arabia", "ottoman", "middle east"]):
+        if gender == "female":
+            return VOICE_PRESETS["british_female"]
+        else:
+            return VOICE_PRESETS["middle_eastern_male"]
+    
+    elif any(r in region for r in ["britain", "england", "france", "italy", "europe", "roman"]):
+        if gender == "female":
+            return VOICE_PRESETS["british_female"]
+        else:
+            return VOICE_PRESETS["british_male"]
+    
+    else: 
+        # Default fallback
+        if gender == "female":
+            return VOICE_PRESETS["american_female"]
+        else: 
+            return VOICE_PRESETS["american_male"]
 
-# Speaking style keywords
-SLOW_STYLES = ["slow", "contemplative", "wise", "spiritual"]
-FAST_STYLES = ["fast", "energetic", "passionate", "excited"]
-MEASURED_STYLES = ["measured", "dignified", "regal"]
 
-# Personality keywords
-GENTLE_TRAITS = ["gentle", "kind", "peaceful"]
+def generate_voice_settings_for_persona(persona: Dict) -> Dict:
+    """Wrapper function for compatibility."""
+    return get_voice_settings_for_dynamic_persona(persona)
 
 
-async def _generate_speech_async(
-    text: str,
-    voice:  str,
-    rate: str,
-    pitch: str
-) -> Optional[bytes]:
-    """Generate speech using Edge-TTS asynchronously."""
+async def _generate_speech_async(text: str, voice:  str, rate: str, pitch: str) -> Optional[bytes]:
+    """Generate speech asynchronously using Edge-TTS."""
     try:
-        # Clean text
+        # Clean text for TTS
         clean_text = text.replace("*", "").replace("_", "").replace("#", "")
         clean_text = clean_text.replace("**", "").replace("__", "")
         
-        if len(clean_text) > 3000:
-            clean_text = clean_text[:3000] + "..."
+        # Limit length
+        if len(clean_text) > 2000:
+            clean_text = clean_text[:2000] + "..."
         
         if not clean_text. strip():
             return None
@@ -116,72 +138,62 @@ async def _generate_speech_async(
             pitch=pitch
         )
         
-        audio_bytes = BytesIO()
+        audio_buffer = BytesIO()
         
         async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_bytes.write(chunk["data"])
+            if chunk["type"] == "audio": 
+                audio_buffer.write(chunk["data"])
         
-        audio_bytes. seek(0)
-        return audio_bytes.read()
-    
+        audio_buffer.seek(0)
+        return audio_buffer.read()
+        
     except Exception as e:
-        print(f"Edge-TTS Error: {e}")
+        print(f"TTS Error: {e}")
         return None
 
 
-def generate_speech(
-    text: str,
-    voice: str = "en-IN-PrabhatNeural",
-    rate: str = "-10%",
-    pitch: str = "-5Hz"
-) -> Optional[bytes]:
-    """Synchronous wrapper for speech generation."""
+def generate_speech(text: str, voice_settings: Dict) -> Optional[str]:
+    """
+    Generate speech and return base64 encoded audio. 
+    """
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop. run_until_complete(
-            _generate_speech_async(text, voice, rate, pitch)
+        
+        audio_bytes = loop.run_until_complete(
+            _generate_speech_async(
+                text,
+                voice_settings. get("voice", "en-US-GuyNeural"),
+                voice_settings.get("rate", "-10%"),
+                voice_settings.get("pitch", "-5Hz")
+            )
         )
+        
         loop.close()
-        return result
+        
+        if audio_bytes: 
+            return base64.b64encode(audio_bytes).decode()
+        return None
+        
     except Exception as e:
-        print(f"Speech error: {e}")
+        print(f"Speech generation error: {e}")
         return None
 
 
-def generate_persona_speech(text: str, persona_key: str, persona_voice_settings: Optional[dict] = None) -> Optional[str]:
+def generate_persona_speech(text: str, persona_key: str, voice_settings: Optional[Dict] = None) -> Optional[str]:
     """
-    Generate speech for a specific persona. 
-    Returns base64 encoded audio.
-    
-    Args:
-        text: Text to speak
-        persona_key: Key of the persona
-        persona_voice_settings: Optional voice settings dict for dynamic personas
+    Generate speech for a persona. 
+    Uses provided voice_settings or looks up from preset mapping.
     """
-    # Use provided voice settings (for dynamic personas) or look up preset
-    if persona_voice_settings:
-        voice = persona_voice_settings.get("voice", "en-IN-PrabhatNeural")
-        rate = persona_voice_settings.get("rate", "-10%")
-        pitch = persona_voice_settings.get("pitch", "-5Hz")
+    if voice_settings:
+        settings = voice_settings
+    elif persona_key in PERSONA_VOICE_MAP:
+        preset_name = PERSONA_VOICE_MAP[persona_key]
+        settings = VOICE_PRESETS. get(preset_name, VOICE_PRESETS["american_male"])
     else:
-        preset_name = PERSONA_VOICE_MAP.get(persona_key, "indian_male_royal")
-        preset = VOICE_PRESETS.get(preset_name, VOICE_PRESETS["indian_male_royal"])
-        voice = preset["voice"]
-        rate = preset["rate"]
-        pitch = preset["pitch"]
+        settings = VOICE_PRESETS["american_male"]
     
-    audio_bytes = generate_speech(
-        text=text,
-        voice=voice,
-        rate=rate,
-        pitch=pitch
-    )
-    
-    if audio_bytes:
-        return base64.b64encode(audio_bytes).decode()
-    return None
+    return generate_speech(text, settings)
 
 
 def get_audio_player_html(b64_audio: str, autoplay: bool = True) -> str:
@@ -192,95 +204,14 @@ def get_audio_player_html(b64_audio: str, autoplay: bool = True) -> str:
     unique_id = f"audio_{int(time.time() * 1000)}"
     autoplay_attr = "autoplay" if autoplay else ""
     
-    html = f"""
-    <audio id="{unique_id}" {autoplay_attr} controls 
-           style="width: 100%; margin: 10px 0; border-radius: 25px;">
+    return f"""
+    <audio id="{unique_id}" {autoplay_attr} controls style="width: 100%; margin: 10px 0; border-radius: 25px;">
         <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
     </audio>
     <script>
         (function() {{
-            var audio = document.getElementById('{unique_id}');
-            if (audio) {{
-                audio.play().catch(function(e) {{ console.log('Autoplay blocked'); }});
-            }}
+            var a = document.getElementById('{unique_id}');
+            if(a) a.play().catch(function(e){{}});
         }})();
     </script>
     """
-    return html
-
-
-def generate_voice_settings_for_persona(persona_data: dict) -> dict:
-    """
-    Generate appropriate voice settings for a dynamically created persona.
-    
-    Args:
-        persona_data: Dict with persona info including region, personality_traits, etc.
-        
-    Returns:
-        Dict with voice settings (voice, rate, pitch)
-    """
-    region = persona_data.get("region", "").lower()
-    personality = persona_data.get("personality_traits", [])
-    speaking_style = persona_data.get("speaking_style", "").lower()
-    title = persona_data.get("title", "").lower()
-    
-    # Determine base voice by region and gender hints
-    voice = "en-IN-PrabhatNeural"  # Default Indian male
-    
-    if any(word in region for word in INDIAN_REGIONS):
-        # Indian voices
-        if any(word in title for word in FEMALE_TITLES):
-            voice = "en-IN-NeerjaNeural"  # Indian female
-        else:
-            voice = "en-IN-PrabhatNeural"  # Indian male
-    elif any(word in region for word in BRITISH_REGIONS):
-        # British voices
-        if any(word in title for word in FEMALE_TITLES):
-            voice = "en-GB-SoniaNeural"  # British female
-        else:
-            voice = "en-GB-RyanNeural"  # British male
-    elif any(word in region for word in EGYPTIAN_REGIONS):
-        voice = "en-US-AriaNeural"  # American female for variety
-    elif any(word in region for word in EUROPEAN_REGIONS):
-        voice = "en-GB-RyanNeural"  # British male for European
-    elif any(word in title for word in FEMALE_TITLES):
-        voice = "en-US-AriaNeural"  # Female voice
-    
-    # Determine rate based on personality and speaking style
-    rate = "-10%"  # Default moderate
-    if any(word in speaking_style for word in SLOW_STYLES):
-        rate = "-15%"
-    elif any(word in speaking_style for word in FAST_STYLES):
-        rate = "+5%"
-    elif any(word in speaking_style for word in MEASURED_STYLES):
-        rate = "-10%"
-    
-    # Determine pitch based on role and personality
-    pitch = "-5Hz"  # Default
-    if any(word in title for word in MALE_ROYAL_TITLES):
-        pitch = "-8Hz"  # Deeper for authority
-    elif any(word in title for word in SPIRITUAL_TITLES):
-        pitch = "+2Hz"  # Slightly higher, gentle
-    elif any(word in title for word in FEMALE_TITLES):
-        pitch = "+3Hz"  # Higher for female
-    elif any(word in personality for word in GENTLE_TRAITS):
-        pitch = "+2Hz"
-    
-    return {
-        "voice": voice,
-        "rate": rate,
-        "pitch": pitch
-    }
-
-
-def get_available_voices():
-    """List all available Edge-TTS voices."""
-    async def _list_voices():
-        voices = await edge_tts.list_voices()
-        return voices
-    
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    voices = loop.run_until_complete(_list_voices())
-    loop.close()
-    return voices
