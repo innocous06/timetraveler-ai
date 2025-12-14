@@ -131,19 +131,33 @@ def generate_speech(
         return None
 
 
-def generate_persona_speech(text: str, persona_key:  str) -> Optional[str]:
+def generate_persona_speech(text: str, persona_key: str, persona_voice_settings: dict = None) -> Optional[str]:
     """
     Generate speech for a specific persona. 
     Returns base64 encoded audio.
+    
+    Args:
+        text: Text to speak
+        persona_key: Key of the persona
+        persona_voice_settings: Optional voice settings dict for dynamic personas
     """
-    preset_name = PERSONA_VOICE_MAP.get(persona_key, "indian_male_royal")
-    preset = VOICE_PRESETS. get(preset_name, VOICE_PRESETS["indian_male_royal"])
+    # Use provided voice settings (for dynamic personas) or look up preset
+    if persona_voice_settings:
+        voice = persona_voice_settings.get("voice", "en-IN-PrabhatNeural")
+        rate = persona_voice_settings.get("rate", "-10%")
+        pitch = persona_voice_settings.get("pitch", "-5Hz")
+    else:
+        preset_name = PERSONA_VOICE_MAP.get(persona_key, "indian_male_royal")
+        preset = VOICE_PRESETS.get(preset_name, VOICE_PRESETS["indian_male_royal"])
+        voice = preset["voice"]
+        rate = preset["rate"]
+        pitch = preset["pitch"]
     
     audio_bytes = generate_speech(
         text=text,
-        voice=preset["voice"],
-        rate=preset["rate"],
-        pitch=preset["pitch"]
+        voice=voice,
+        rate=rate,
+        pitch=pitch
     )
     
     if audio_bytes:
@@ -174,6 +188,70 @@ def get_audio_player_html(b64_audio: str, autoplay: bool = True) -> str:
     </script>
     """
     return html
+
+
+def generate_voice_settings_for_persona(persona_data: dict) -> dict:
+    """
+    Generate appropriate voice settings for a dynamically created persona.
+    
+    Args:
+        persona_data: Dict with persona info including region, personality_traits, etc.
+        
+    Returns:
+        Dict with voice settings (voice, rate, pitch)
+    """
+    region = persona_data.get("region", "").lower()
+    personality = persona_data.get("personality_traits", [])
+    speaking_style = persona_data.get("speaking_style", "").lower()
+    title = persona_data.get("title", "").lower()
+    
+    # Determine base voice by region and gender hints
+    voice = "en-IN-PrabhatNeural"  # Default Indian male
+    
+    if any(word in region for word in ["india", "tamil", "bengal", "delhi", "mughal", "chola", "pandya"]):
+        # Indian voices
+        if any(word in title for word in ["queen", "rani", "empress", "princess"]):
+            voice = "en-IN-NeerjaNeural"  # Indian female
+        else:
+            voice = "en-IN-PrabhatNeural"  # Indian male
+    elif any(word in region for word in ["britain", "england", "british", "uk", "london"]):
+        # British voices
+        if any(word in title for word in ["queen", "lady", "duchess"]):
+            voice = "en-GB-SoniaNeural"  # British female
+        else:
+            voice = "en-GB-RyanNeural"  # British male
+    elif any(word in region for word in ["egypt", "africa", "alexandria"]):
+        voice = "en-US-AriaNeural"  # American female for variety
+    elif any(word in region for word in ["europe", "italy", "france", "spain", "rome"]):
+        voice = "en-GB-RyanNeural"  # British male for European
+    elif any(word in title for word in ["queen", "empress", "lady", "marie", "cleopatra"]):
+        voice = "en-US-AriaNeural"  # Female voice
+    
+    # Determine rate based on personality and speaking style
+    rate = "-10%"  # Default moderate
+    if any(word in speaking_style for word in ["slow", "contemplative", "wise", "spiritual"]):
+        rate = "-15%"
+    elif any(word in speaking_style for word in ["fast", "energetic", "passionate", "excited"]):
+        rate = "+5%"
+    elif any(word in speaking_style for word in ["measured", "dignified", "regal"]):
+        rate = "-10%"
+    
+    # Determine pitch based on role and personality
+    pitch = "-5Hz"  # Default
+    if any(word in title for word in ["king", "emperor", "warrior", "general"]):
+        pitch = "-8Hz"  # Deeper for authority
+    elif any(word in title for word in ["priest", "monk", "spiritual"]):
+        pitch = "+2Hz"  # Slightly higher, gentle
+    elif any(word in title for word in ["queen", "empress", "princess"]):
+        pitch = "+3Hz"  # Higher for female
+    elif any(word in personality for word in ["gentle", "kind", "peaceful"]):
+        pitch = "+2Hz"
+    
+    return {
+        "voice": voice,
+        "rate": rate,
+        "pitch": pitch
+    }
 
 
 def get_available_voices():
