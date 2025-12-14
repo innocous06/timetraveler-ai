@@ -13,11 +13,12 @@ from landmarks import get_landmark, get_all_landmarks, identify_landmark_from_te
 from utils import (
     configure_gemini, get_gemini_model, analyze_image,
     match_to_database, generate_persona_response,
-    generate_greeting, get_suggested_questions, DEFAULT_MODEL
+    generate_greeting, get_suggested_questions, DEFAULT_MODEL,
+    generate_dynamic_persona
 )
-from voice_engine import generate_persona_speech, get_audio_player_html
+from voice_engine import generate_persona_speech, get_audio_player_html, generate_voice_settings_for_persona
 from presentation_mode import create_mini_presentation, get_presentation_css
-from image_fetcher import fetch_landmark_images, init_image_cache
+from image_fetcher import fetch_landmark_images, init_image_cache, get_fallback_images
 from immersive_view import render_immersive_view
 
 # ============== PAGE CONFIG ==============
@@ -224,6 +225,8 @@ def init_session_state():
         "immersive_mode": False,
         "current_image_index": 0,
         "landmark_images": [],
+        "dynamic_persona_data": None,  # Store dynamically generated persona
+        "dynamic_persona_voice": None,  # Store voice settings for dynamic persona
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -314,6 +317,8 @@ def render_sidebar():
                 st.session_state.chat_history = []
                 st.session_state.greeted = False
                 st.session_state.landmark_images = []
+                st.session_state.dynamic_persona_data = None
+                st.session_state.dynamic_persona_voice = None
                 st.rerun()
         
         st.markdown("---")
@@ -335,6 +340,8 @@ def render_sidebar():
                 st.session_state.chat_history = []
                 st.session_state.greeted = False
                 st.session_state.landmark_images = []
+                st.session_state.dynamic_persona_data = None
+                st.session_state.dynamic_persona_voice = None
                 st.rerun()
         
         st.markdown("---")
@@ -346,6 +353,8 @@ def render_sidebar():
             st.session_state.current_landmark = None
             st.session_state.greeted = False
             st.session_state.landmark_images = []
+            st.session_state.dynamic_persona_data = None
+            st.session_state.dynamic_persona_voice = None
             st.rerun()
         
         st.markdown("---")
@@ -390,18 +399,42 @@ with col_left:
                     if analysis.get("identified"):
                         st.success(f"**{analysis.get('landmark_name')}** - {analysis.get('location', 'Unknown')}")
                     
+                    # First, try to match to database
                     landmark_key = match_to_database(analysis)
                     
                     if landmark_key:
+                        # Found in database - use preset persona
                         landmark = get_landmark(landmark_key)
                         st.session_state.current_landmark = landmark_key
                         st.session_state.current_persona = landmark["default_persona"]
+                        st.session_state.dynamic_persona_data = None
+                        st.session_state.dynamic_persona_voice = None
                         st.session_state.chat_history = []
                         st.session_state.greeted = False
                         st.session_state.landmark_images = []
                         st.rerun()
                     else:
-                        st.warning("Landmark not in database. Try selecting a persona manually!")
+                        # Not in database - generate dynamic persona
+                        with st.spinner("✨ Summoning a historical guide..."):
+                            dynamic_persona = generate_dynamic_persona(analysis, st.session_state.model)
+                            
+                            if dynamic_persona:
+                                st.success(f"**Guide Found:** {dynamic_persona['name']} - {dynamic_persona['title']}")
+                                
+                                # Generate voice settings for the dynamic persona
+                                voice_settings = generate_voice_settings_for_persona(dynamic_persona)
+                                
+                                # Store in session state
+                                st.session_state.dynamic_persona_data = dynamic_persona
+                                st.session_state.dynamic_persona_voice = voice_settings
+                                st.session_state.current_persona = "dynamic_persona"
+                                st.session_state.current_landmark = None
+                                st.session_state.chat_history = []
+                                st.session_state.greeted = False
+                                st.session_state.landmark_images = []
+                                st.rerun()
+                            else:
+                                st.warning("Could not identify landmark or generate persona. Try selecting a preset guide!")
     
     # Current landmark info
     if st.session_state.current_landmark:
@@ -428,7 +461,12 @@ with col_right:
     st.markdown("### 💬 Speak with History")
     
     if st.session_state.current_persona:
-        persona = get_persona(st.session_state.current_persona)
+        # Get persona - either from database or dynamic
+        if st.session_state.current_persona == "dynamic_persona" and st.session_state.dynamic_persona_data:
+            persona = st.session_state.dynamic_persona_data
+        else:
+            persona = get_persona(st.session_state.current_persona)
+        
         landmark = get_landmark(st.session_state.current_landmark) if st.session_state.current_landmark else None
         
         # Persona Card
@@ -441,17 +479,22 @@ with col_right:
         </div>
         """, unsafe_allow_html=True)
         
-        # Fetch landmark images if needed
-        if landmark and not st.session_state.landmark_images:
+        # Fetch landmark images if needed (or use fallback)
+        if not st.session_state.landmark_images:
             try:
-                with st.spinner("🖼️ Loading images..."):
-                    st.session_state.landmark_images = fetch_landmark_images(
-                        st.session_state.current_landmark, 
-                        landmark
-                    )
+                if landmark:
+                    with st.spinner("🖼️ Loading images..."):
+                        st.session_state.landmark_images = fetch_landmark_images(
+                            st.session_state.current_landmark, 
+                            landmark
+                        )
+                else:
+                    # No landmark in database - use fallback images
+                    st.session_state.landmark_images = get_fallback_images("monument", count=4)
             except Exception as e:
                 st.warning(f"⚠️ Could not load images: {e}")
-                st.session_state.landmark_images = []
+                # Always ensure we have fallback images for immersive mode
+                st.session_state.landmark_images = get_fallback_images("monument", count=4)
         
         # Generate greeting
         if not st.session_state.greeted and st.session_state.api_configured:
@@ -459,13 +502,15 @@ with col_right:
                 greeting = generate_greeting(
                     st.session_state.current_persona,
                     st.session_state.current_landmark,
-                    st.session_state.model
+                    st.session_state.model,
+                    persona
                 )
                 
                 # Generate voice
                 audio_b64 = None
                 if st.session_state.audio_enabled:
-                    audio_b64 = generate_persona_speech(greeting, st.session_state.current_persona)
+                    voice_settings = st.session_state.dynamic_persona_voice if st.session_state.current_persona == "dynamic_persona" else None
+                    audio_b64 = generate_persona_speech(greeting, st.session_state.current_persona, voice_settings)
                 
                 st.session_state.chat_history.append({
                     "role": "assistant",
@@ -534,17 +579,22 @@ with col_right:
             })
             
             with st.spinner("✨ Channeling the past..."):
+                # Get persona data (dynamic or preset)
+                current_persona_data = st.session_state.dynamic_persona_data if st.session_state.current_persona == "dynamic_persona" else None
+                
                 response = generate_persona_response(
                     st.session_state.current_persona,
                     st.session_state.current_landmark,
                     user_input,
                     [{"role": m["role"], "content": m["content"]} for m in st.session_state.chat_history[:-1]],
-                    st.session_state.model
+                    st.session_state.model,
+                    current_persona_data
                 )
                 
                 audio_b64 = None
                 if st.session_state.audio_enabled:
-                    audio_b64 = generate_persona_speech(response, st.session_state.current_persona)
+                    voice_settings = st.session_state.dynamic_persona_voice if st.session_state.current_persona == "dynamic_persona" else None
+                    audio_b64 = generate_persona_speech(response, st.session_state.current_persona, voice_settings)
                 
                 st.session_state.chat_history.append({
                     "role": "assistant",
@@ -572,17 +622,22 @@ with col_right:
                     })
                     
                     with st.spinner("✨"):
+                        # Get persona data (dynamic or preset)
+                        current_persona_data = st.session_state.dynamic_persona_data if st.session_state.current_persona == "dynamic_persona" else None
+                        
                         response = generate_persona_response(
                             st.session_state.current_persona,
                             st.session_state.current_landmark,
                             suggestion,
                             [{"role": m["role"], "content":  m["content"]} for m in st.session_state.chat_history[:-1]],
-                            st.session_state.model
+                            st.session_state.model,
+                            current_persona_data
                         )
                         
                         audio_b64 = None
                         if st.session_state.audio_enabled:
-                            audio_b64 = generate_persona_speech(response, st.session_state.current_persona)
+                            voice_settings = st.session_state.dynamic_persona_voice if st.session_state.current_persona == "dynamic_persona" else None
+                            audio_b64 = generate_persona_speech(response, st.session_state.current_persona, voice_settings)
                         
                         st.session_state.chat_history.append({
                             "role": "assistant",

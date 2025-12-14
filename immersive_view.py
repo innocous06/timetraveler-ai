@@ -8,6 +8,9 @@ import streamlit.components.v1 as components
 from typing import Dict, List, Optional
 import json
 
+# Constants
+IMAGE_LOAD_ERROR_MESSAGE = "Image failed to load"
+
 
 def create_immersive_html(
     images: List[Dict],
@@ -154,6 +157,12 @@ def create_immersive_html(
                 object-fit: contain;
                 border-radius: 15px;
                 box-shadow: 0 0 60px rgba(233, 69, 96, 0.4);
+                background: rgba(0,0,0,0.2);
+            }}
+            
+            .slide-image.error {{
+                background: rgba(233, 69, 96, 0.2);
+                border: 2px dashed #e94560;
             }}
             
             /* Gradient Overlay */
@@ -415,7 +424,15 @@ def create_immersive_html(
                 images.forEach((img, index) => {{
                     const slide = document.createElement('div');
                     slide.className = 'slide' + (index === currentSlide ? ' active' : '');
-                    slide.innerHTML = `<img src="${{img.url}}" class="slide-image" alt="${{img.caption}}">`;
+                    const imgElement = document.createElement('img');
+                    imgElement.src = img.url;
+                    imgElement.className = 'slide-image';
+                    imgElement.alt = img.caption;
+                    imgElement.onerror = function() {{
+                        this.classList.add('error');
+                        this.alt = '{IMAGE_LOAD_ERROR_MESSAGE}';
+                    }};
+                    slide.appendChild(imgElement);
                     slideshow.appendChild(slide);
                     
                     // Create indicator
@@ -520,6 +537,11 @@ def render_immersive_view(
         current_index: Current image index
         show_audio_visualizer: Show audio visualizer
     """
+    # Ensure we have valid images
+    if not images or len(images) == 0:
+        st.warning("⚠️ No images available for immersive mode")
+        return
+    
     html = create_immersive_html(
         images=images,
         persona_data=persona_data,
@@ -528,4 +550,5 @@ def render_immersive_view(
         show_audio_visualizer=show_audio_visualizer
     )
     
-    components.html(html, height=None, scrolling=False)
+    # Use explicit height for better rendering
+    components.html(html, height=800, scrolling=False)
