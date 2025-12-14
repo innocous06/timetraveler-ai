@@ -10,7 +10,7 @@ import re
 from typing import Optional, Dict, List
 
 # Configuration
-DEFAULT_MODEL = "gemini-2.0-flash"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 
 def configure_gemini(api_key:  str = None) -> bool:
