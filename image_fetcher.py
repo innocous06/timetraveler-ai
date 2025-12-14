@@ -1,30 +1,26 @@
 """
-Image Fetcher for TimeTraveler AI.
-Fetches real images from Wikipedia/Wikimedia Commons API with caching.
+Image Fetcher for TimeTraveler AI. 
+Fetches real images from Wikipedia/Wikimedia Commons with reliable fallbacks.
 """
 
 import requests
 import streamlit as st
-from typing import List, Dict, Optional
-import urllib.parse
-import re
+from typing import List, Dict
 import time
+import hashlib
 
 
 # Wikipedia API endpoint
-WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
+WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 
-# Placeholder fallback URLs (using picsum.photos which is reliable)
-PLACEHOLDER_FALLBACKS = {
-    "temple": "https://picsum.photos/800/600?random=1",
-    "palace": "https://picsum.photos/800/600?random=2",
-    "fort": "https://picsum.photos/800/600?random=3",
-    "monument": "https://picsum.photos/800/600?random=4",
-    "pyramid": "https://picsum.photos/800/600?random=5",
-    "rome": "https://picsum.photos/800/600?random=6",
-    "taj": "https://picsum.photos/800/600?random=7",
-    "stupa": "https://picsum.photos/800/600?random=8",
-}
+# Reliable placeholder images (these ALWAYS work)
+PLACEHOLDER_IMAGES = [
+    "https://images.unsplash.com/photo-1524492412937-b28074a5d7da? w=800",  # Taj Mahal
+    "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800",  # Taj Mahal 2
+    "https://images.unsplash.com/photo-1548013146-72479768bada?w=800",  # India monument
+    "https://images.unsplash.com/photo-1506461883276-594a12b11cf3?w=800",  # Ancient temple
+    "https://images.unsplash.com/photo-1545126550-ece49ce5ca40?w=800",  # Historical building
+]
 
 
 def init_image_cache():
@@ -33,26 +29,42 @@ def init_image_cache():
         st.session_state.image_cache = {}
 
 
+def get_reliable_fallback_images(landmark_name: str = "", count: int = 4) -> List[Dict]:
+    """
+    Get reliable placeholder images that ALWAYS work.
+    Uses Unsplash images which are reliable and free.
+    """
+    # Create unique but consistent images based on landmark name
+    seed = hashlib.md5(landmark_name.encode()).hexdigest()[:8]
+    
+    images = []
+    for i in range(count):
+        # Use Lorem Picsum which is very reliable
+        url = f"https://picsum.photos/seed/{seed}{i}/800/600"
+        images.append({
+            "url":  url,
+            "caption": f"{landmark_name} - View {i+1}" if landmark_name else f"Historical Monument - View {i+1}"
+        })
+    
+    return images
+
+
 def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
     """
-    Search for images on Wikipedia/Wikimedia Commons.
-    
-    Args:
-        search_term: Term to search for
-        limit: Maximum number of images to return
-        
-    Returns:
-        List of dicts with 'url' and 'caption' keys
+    Search for images on Wikipedia.
+    Returns list of dicts with 'url' and 'caption'. 
     """
-    try:
-        # Check cache first
-        cache_key = f"{search_term}_{limit}"
-        if cache_key in st.session_state.get('image_cache', {}):
+    try: 
+        init_image_cache()
+        
+        # Check cache
+        cache_key = f"wiki_{search_term}_{limit}"
+        if cache_key in st.session_state. image_cache:
             return st.session_state.image_cache[cache_key]
         
         images = []
         
-        # Step 1: Search for the page
+        # Step 1: Search for the Wikipedia page
         search_params = {
             "action": "query",
             "format": "json",
@@ -61,15 +73,18 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
             "srlimit": 1
         }
         
-        response = requests.get(WIKIPEDIA_API_URL, params=search_params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        time.sleep(0.2)
-        
-        if not data.get("query", {}).get("search"):
+        response = requests.get(WIKIPEDIA_API, params=search_params, timeout=10)
+        if response.status_code != 200:
             return []
         
-        page_title = data["query"]["search"][0]["title"]
+        data = response.json()
+        search_results = data.get("query", {}).get("search", [])
+        
+        if not search_results:
+            return []
+        
+        page_title = search_results[0]["title"]
+        time.sleep(0.1)  # Rate limiting
         
         # Step 2: Get images from the page
         image_params = {
@@ -77,194 +92,108 @@ def search_wikipedia_images(search_term: str, limit: int = 5) -> List[Dict]:
             "format": "json",
             "titles": page_title,
             "prop": "images",
-            "imlimit": limit * 3  # Get more to filter
+            "imlimit": 20
         }
         
-        response = requests.get(WIKIPEDIA_API_URL, params=image_params, timeout=10)
-        response.raise_for_status()
+        response = requests.get(WIKIPEDIA_API, params=image_params, timeout=10)
+        if response. status_code != 200:
+            return []
+        
         data = response.json()
-        time.sleep(0.2)
-        
         pages = data.get("query", {}).get("pages", {})
-        page = next(iter(pages.values()), {})
-        image_list = page.get("images", [])
         
-        # Step 3: Get image URLs
-        for img in image_list[:limit * 2]:
-            img_title = img.get("title", "")
+        image_titles = []
+        for page_id, page_data in pages.items():
+            for img in page_data.get("images", []):
+                title = img.get("title", "")
+                # Filter out non-photos
+                if any(ext in title.lower() for ext in ['.jpg', '.jpeg', '. png']):
+                    if not any(skip in title.lower() for skip in ['icon', 'logo', 'flag', 'map', 'symbol', 'button', 'commons-logo']):
+                        image_titles. append(title)
+        
+        # Step 3: Get actual URLs for each image
+        for img_title in image_titles[: limit + 3]: 
+            time.sleep(0.1)  # Rate limiting
             
-            # Skip non-image files
-            if not any(ext in img_title.lower() for ext in ['.jpg', '.jpeg', '.png', '.svg']):
-                continue
-            
-            # Skip icons, logos, flags
-            if any(skip in img_title.lower() for skip in ['icon', 'logo', 'flag', 'button', 'symbol']):
-                continue
-            
-            # Get image info
-            info_params = {
-                "action": "query",
+            url_params = {
+                "action":  "query",
                 "format": "json",
                 "titles": img_title,
                 "prop": "imageinfo",
-                "iiprop": "url|extmetadata",
+                "iiprop": "url",
                 "iiurlwidth": 800
             }
             
-            response = requests.get(WIKIPEDIA_API_URL, params=info_params, timeout=10)
-            response.raise_for_status()
-            info_data = response.json()
-            time.sleep(0.2)
-            
-            info_pages = info_data.get("query", {}).get("pages", {})
-            info_page = next(iter(info_pages.values()), {})
-            imageinfo = info_page.get("imageinfo", [{}])[0]
-            
-            if imageinfo.get("thumburl"):
-                # Get caption from metadata
-                extmetadata = imageinfo.get("extmetadata", {})
-                caption = extmetadata.get("ImageDescription", {}).get("value", "")
-                if not caption:
-                    caption = extmetadata.get("ObjectName", {}).get("value", img_title)
+            try:
+                response = requests.get(WIKIPEDIA_API, params=url_params, timeout=10)
+                if response.status_code != 200:
+                    continue
                 
-                # Clean HTML from caption
-                caption = re.sub('<[^<]+?>', '', caption)
-                caption = caption[:100] if len(caption) > 100 else caption
+                data = response.json()
+                pages = data.get("query", {}).get("pages", {})
                 
-                images.append({
-                    "url": imageinfo["thumburl"],
-                    "caption": caption or img_title.replace("File:", "").replace("_", " ")
-                })
-            
-            if len(images) >= limit:
-                break
+                for page_id, page_data in pages.items():
+                    imageinfo = page_data.get("imageinfo", [])
+                    if imageinfo:
+                        thumb_url = imageinfo[0]. get("thumburl") or imageinfo[0].get("url")
+                        if thumb_url:
+                            caption = img_title. replace("File:", "").replace("_", " ")
+                            caption = caption.rsplit(".", 1)[0][:50]  # Remove extension, limit length
+                            images.append({
+                                "url": thumb_url,
+                                "caption": caption
+                            })
+                
+                if len(images) >= limit:
+                    break
+                    
+            except Exception:
+                continue
         
-        # Cache the results
+        # Cache results
         if images:
-            if 'image_cache' not in st.session_state:
-                st.session_state.image_cache = {}
             st.session_state.image_cache[cache_key] = images
         
-        return images
-    
+        return images[: limit]
+        
     except Exception as e:
-        print(f"Wikipedia image search error for '{search_term}': {e}")
+        print(f"Wikipedia API error: {e}")
         return []
 
 
-def get_fallback_images(category: str = "monument", count: int = 3) -> List[Dict]:
+def fetch_landmark_images(landmark_name: str, landmark_info: Dict = None) -> List[Dict]:
     """
-    Get fallback images from placeholder service.
-    
-    Args:
-        category: Category of images (temple, palace, fort, etc.)
-        count: Number of images to generate
-        
-    Returns:
-        List of dicts with 'url' and 'caption' keys
-    """
-    base_url = PLACEHOLDER_FALLBACKS.get(category, PLACEHOLDER_FALLBACKS["monument"])
-    
-    images = []
-    for i in range(count):
-        # Add random parameter to get different images
-        url = f"{base_url}&sig={i}"
-        images.append({
-            "url": url,
-            "caption": f"Historical {category.title()} View {i+1}"
-        })
-    
-    return images
-
-
-def fetch_landmark_images(landmark_key: str, landmark_data: Dict) -> List[Dict]:
-    """
-    Fetch images for a landmark using Wikipedia search or fallback.
-    
-    Args:
-        landmark_key: Key of the landmark
-        landmark_data: Landmark data dict
-        
-    Returns:
-        List of image dicts with 'url' and 'caption' keys.
-        Returns fallback images if Wikipedia search fails.
+    Main function to fetch images for a landmark.
+    Tries Wikipedia first, falls back to reliable placeholders.
     """
     init_image_cache()
     
-    try:
-        # Check if images already exist in landmark data
-        if landmark_data.get("gallery_images"):
-            existing = landmark_data["gallery_images"]
-            if existing and all(img.get("url") for img in existing):
-                return existing
-        
-        # Try Wikipedia search
-        search_term = landmark_data.get("wikipedia_search") or landmark_data.get("name")
-        images = search_wikipedia_images(search_term, limit=5)
-    except Exception as e:
-        print(f"Wikipedia image fetch error for '{landmark_key}': {e}")
-        images = []
+    # Determine search term
+    if landmark_info:
+        search_term = landmark_info.get("wikipedia_search") or landmark_info.get("name") or landmark_name
+    else:
+        search_term = landmark_name
     
-    # If not enough images, try alternate search terms
+    # Try Wikipedia first
+    images = search_wikipedia_images(search_term, limit=5)
+    
+    # If not enough images, try with location added
+    if len(images) < 3 and landmark_info:
+        location = landmark_info.get("location", "")
+        if location: 
+            more_images = search_wikipedia_images(f"{search_term} {location}", limit=3)
+            for img in more_images:
+                if img["url"] not in [i["url"] for i in images]: 
+                    images.append(img)
+    
+    # If still not enough, add reliable fallbacks
     if len(images) < 3:
-        try:
-            # Try with location
-            location = landmark_data.get("location", "")
-            if location:
-                alt_search = f"{search_term} {location}"
-                more_images = search_wikipedia_images(alt_search, limit=3)
-                images.extend(more_images)
-        except Exception as e:
-            print(f"Alternate search failed for '{landmark_key}': {e}")
+        fallbacks = get_reliable_fallback_images(search_term, count=4 - len(images))
+        images.extend(fallbacks)
     
-    # Remove duplicates
-    seen_urls = set()
-    unique_images = []
-    for img in images:
-        if img["url"] not in seen_urls:
-            seen_urls.add(img["url"])
-            unique_images.append(img)
-    
-    images = unique_images[:5]
-    
-    # If still not enough, use fallback
-    if len(images) < 2:
-        # Determine category from landmark type
-        landmark_type = landmark_data.get("type", "").lower()
-        category = "monument"
-        if "temple" in landmark_type:
-            category = "temple"
-        elif "palace" in landmark_type:
-            category = "palace"
-        elif "fort" in landmark_type:
-            category = "fort"
-        elif "pyramid" in landmark_key:
-            category = "pyramid"
-        elif "colosseum" in landmark_key:
-            category = "rome"
-        elif "taj" in landmark_key:
-            category = "taj"
-        elif "stupa" in landmark_key:
-            category = "stupa"
-        
-        fallback = get_fallback_images(category, count=3)
-        images.extend(fallback)
-        images = images[:5]
-    
-    return images
+    return images[: 5]
 
 
-def get_persona_avatar_url(persona_key: str) -> Optional[str]:
-    """
-    Get avatar image URL for a persona (placeholder for now).
-    Could be extended to fetch from Wikipedia.
-    
-    Args:
-        persona_key: Key of the persona
-        
-    Returns:
-        URL string or None
-    """
-    # For now, return None to use emoji avatars
-    # Could be extended to search Wikipedia for historical figure portraits
-    return None
+def get_fallback_images(category: str = "monument", count: int = 4) -> List[Dict]:
+    """Get fallback images - wrapper for compatibility."""
+    return get_reliable_fallback_images(category, count)
