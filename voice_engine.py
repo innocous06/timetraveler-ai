@@ -71,6 +71,25 @@ PERSONA_VOICE_MAP = {
     "chola_king": "indian_male_royal",
 }
 
+# Regional keywords for voice selection
+INDIAN_REGIONS = ["india", "tamil", "bengal", "delhi", "mughal", "chola", "pandya"]
+BRITISH_REGIONS = ["britain", "england", "british", "uk", "london"]
+EGYPTIAN_REGIONS = ["egypt", "africa", "alexandria"]
+EUROPEAN_REGIONS = ["europe", "italy", "france", "spain", "rome"]
+
+# Gender/role keywords for voice selection
+FEMALE_TITLES = ["queen", "rani", "empress", "princess", "lady", "duchess", "marie", "cleopatra"]
+MALE_ROYAL_TITLES = ["king", "emperor", "warrior", "general"]
+SPIRITUAL_TITLES = ["priest", "monk", "spiritual"]
+
+# Speaking style keywords
+SLOW_STYLES = ["slow", "contemplative", "wise", "spiritual"]
+FAST_STYLES = ["fast", "energetic", "passionate", "excited"]
+MEASURED_STYLES = ["measured", "dignified", "regal"]
+
+# Personality keywords
+GENTLE_TRAITS = ["gentle", "kind", "peaceful"]
+
 
 async def _generate_speech_async(
     text: str,
@@ -131,7 +150,7 @@ def generate_speech(
         return None
 
 
-def generate_persona_speech(text: str, persona_key: str, persona_voice_settings: dict = None) -> Optional[str]:
+def generate_persona_speech(text: str, persona_key: str, persona_voice_settings: Optional[dict] = None) -> Optional[str]:
     """
     Generate speech for a specific persona. 
     Returns base64 encoded audio.
@@ -208,43 +227,43 @@ def generate_voice_settings_for_persona(persona_data: dict) -> dict:
     # Determine base voice by region and gender hints
     voice = "en-IN-PrabhatNeural"  # Default Indian male
     
-    if any(word in region for word in ["india", "tamil", "bengal", "delhi", "mughal", "chola", "pandya"]):
+    if any(word in region for word in INDIAN_REGIONS):
         # Indian voices
-        if any(word in title for word in ["queen", "rani", "empress", "princess"]):
+        if any(word in title for word in FEMALE_TITLES):
             voice = "en-IN-NeerjaNeural"  # Indian female
         else:
             voice = "en-IN-PrabhatNeural"  # Indian male
-    elif any(word in region for word in ["britain", "england", "british", "uk", "london"]):
+    elif any(word in region for word in BRITISH_REGIONS):
         # British voices
-        if any(word in title for word in ["queen", "lady", "duchess"]):
+        if any(word in title for word in FEMALE_TITLES):
             voice = "en-GB-SoniaNeural"  # British female
         else:
             voice = "en-GB-RyanNeural"  # British male
-    elif any(word in region for word in ["egypt", "africa", "alexandria"]):
+    elif any(word in region for word in EGYPTIAN_REGIONS):
         voice = "en-US-AriaNeural"  # American female for variety
-    elif any(word in region for word in ["europe", "italy", "france", "spain", "rome"]):
+    elif any(word in region for word in EUROPEAN_REGIONS):
         voice = "en-GB-RyanNeural"  # British male for European
-    elif any(word in title for word in ["queen", "empress", "lady", "marie", "cleopatra"]):
+    elif any(word in title for word in FEMALE_TITLES):
         voice = "en-US-AriaNeural"  # Female voice
     
     # Determine rate based on personality and speaking style
     rate = "-10%"  # Default moderate
-    if any(word in speaking_style for word in ["slow", "contemplative", "wise", "spiritual"]):
+    if any(word in speaking_style for word in SLOW_STYLES):
         rate = "-15%"
-    elif any(word in speaking_style for word in ["fast", "energetic", "passionate", "excited"]):
+    elif any(word in speaking_style for word in FAST_STYLES):
         rate = "+5%"
-    elif any(word in speaking_style for word in ["measured", "dignified", "regal"]):
+    elif any(word in speaking_style for word in MEASURED_STYLES):
         rate = "-10%"
     
     # Determine pitch based on role and personality
     pitch = "-5Hz"  # Default
-    if any(word in title for word in ["king", "emperor", "warrior", "general"]):
+    if any(word in title for word in MALE_ROYAL_TITLES):
         pitch = "-8Hz"  # Deeper for authority
-    elif any(word in title for word in ["priest", "monk", "spiritual"]):
+    elif any(word in title for word in SPIRITUAL_TITLES):
         pitch = "+2Hz"  # Slightly higher, gentle
-    elif any(word in title for word in ["queen", "empress", "princess"]):
+    elif any(word in title for word in FEMALE_TITLES):
         pitch = "+3Hz"  # Higher for female
-    elif any(word in personality for word in ["gentle", "kind", "peaceful"]):
+    elif any(word in personality for word in GENTLE_TRAITS):
         pitch = "+2Hz"
     
     return {

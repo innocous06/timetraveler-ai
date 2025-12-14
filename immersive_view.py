@@ -8,6 +8,9 @@ import streamlit.components.v1 as components
 from typing import Dict, List, Optional
 import json
 
+# Constants
+IMAGE_LOAD_ERROR_MESSAGE = "Image failed to load"
+
 
 def create_immersive_html(
     images: List[Dict],
@@ -427,7 +430,7 @@ def create_immersive_html(
                     imgElement.alt = img.caption;
                     imgElement.onerror = function() {{
                         this.classList.add('error');
-                        this.alt = 'Image failed to load';
+                        this.alt = '{IMAGE_LOAD_ERROR_MESSAGE}';
                     }};
                     slide.appendChild(imgElement);
                     slideshow.appendChild(slide);

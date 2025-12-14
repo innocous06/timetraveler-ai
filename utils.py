@@ -209,7 +209,12 @@ Respond with ONLY valid JSON (no markdown, no extra text):
                     result_text = result_text[4:]
             result_text = result_text.strip()
         
-        persona_data = json.loads(result_text)
+        # Parse JSON with specific error handling
+        try:
+            persona_data = json.loads(result_text)
+        except json.JSONDecodeError as je:
+            print(f"JSON parsing error: {je}")
+            raise  # Re-raise to be caught by outer exception handler
         
         # Add a unique key for this dynamic persona
         persona_data["key"] = "dynamic_persona"
